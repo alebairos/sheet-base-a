@@ -479,7 +479,7 @@
       if (rg.rows === 1 && ctx && ctx.sheet !== rg.sheet && ctx.c >= rg.c1 && ctx.c <= rg.c2) {
         return asRefErr(this.cellValue(rg.sheet, rg.r1, ctx.c));
       }
-      return E.VALUE;
+      return EREF['#VALUE!'];
     }
 
     // scalar value of an operand
@@ -563,19 +563,24 @@
           return new Range(a.sheet, Math.min(a.r1, b.r1), Math.min(a.c1, b.c1), Math.max(a.r2, b.r2), Math.max(a.c2, b.c2));
         }
         case 'neg': {
-          const v = this.sv(node.a, ctx);
+          let depth = 1, inner = node.a;
+          while (inner.t === 'neg') { depth++; inner = inner.a; }
+          const v = this.sv(inner, ctx);
           const n = this.toNum(v);
-          if (isErr(n)) return n;
-          return n === 0 ? 0 : -n;
+          if (isErr(n)) return asComputed(n);
+          const r = depth % 2 ? -n : n;
+          // Calc keeps the boolean number format through negation
+          if (typeof v === 'boolean' && (r === 0 || r === 1)) return r === 1;
+          return r === 0 ? 0 : r;
         }
         case 'pct': {
           const v = this.sv(node.a, ctx);
           const n = this.toNum(v);
-          if (isErr(n)) return n;
+          if (isErr(n)) return asComputed(n);
           return n / 100;
         }
-        case 'bin': return this.binop(node, ctx);
-        case 'fn': return this.call(node, ctx);
+        case 'bin': return asComputed(this.binop(node, ctx));
+        case 'fn': { const r = this.call(node, ctx); return r === UNKNOWN_FN ? r : asComputed(r); }
       }
       return E.VALUE;
     }
@@ -694,9 +699,16 @@
     collect(nodes, ctx, opts) {
       const nums = [];
       let allBool = true;
+      const vals = [];
       for (const node of nodes) {
         if (node.t === 'missing') continue;
         const v = this.ev(node, ctx);
+        if (isErr(v) && !v.fromRef && !opts.skipErrors) return { err: v };
+        vals.push(v);
+      }
+      // Calc pops parameters from the stack: the last one is examined first
+      for (let k = vals.length - 1; k >= 0; k--) {
+        const v = vals[k];
         if (v instanceof Range) {
           let err = null;
           this.eachCell(v, (x) => {
@@ -711,12 +723,12 @@
             else if (isErr(x) && !opts.skipErrors) return { err: x };
           }
         } else if (typeof v === 'number') { nums.push(v); allBool = false; } else if (typeof v === 'boolean') nums.push(v ? 1 : 0);
-        else if (isErr(v)) { if (!opts.skipErrors) return { err: v }; } else if (typeof v === 'string') {
+        else if (v === EMPTYR) { nums.push(0); allBool = false; } else if (isErr(v)) { if (!opts.skipErrors) return { err: v }; } else if (typeof v === 'string') {
           const n = textToNum(v);
-          if (opts.skipErrors) { if (n !== null) { nums.push(n); allBool = false; } } else if (n === null || !opts.countText) return { err: E.VALUE };
-          else { nums.push(n); allBool = false; }
+          if (opts.countText) { if (n !== null) { nums.push(n); allBool = false; } } else return { err: E.VALUE };
         }
       }
+      nums.reverse();
       return { nums, allBool: allBool && nums.length > 0 };
     }
   }
@@ -854,25 +866,35 @@
     if (typeof x !== 'string') return null;
     return strCmp(x, v);
   }
-  // position (0-based) in a 1-D list, or -1
+  // position (0-based) in a 1-D list, or -1.
+  // mode 0: exact (wildcards); 1: largest <= v; -1: smallest >= v.
+  // On sorted data these agree with Calc; on unsorted data they approximate
+  // Calc's searches (ascending: scan until the first greater value of the same
+  // type; descending: binary search over the values of the same type).
   function lookupPos(list, v, mode) {
-    if (mode === 0) {
+    if (typeof v === 'boolean') v = v ? 1 : 0;
+    if (mode === 0 || (typeof v === 'string' && hasWild(v))) {
       for (let i = 0; i < list.length; i++) if (lookupEq(v, list[i])) return i;
       return -1;
     }
-    let best = -1;
     if (mode > 0) {
+      let best = -1;
       for (let i = 0; i < list.length; i++) {
         const c = lookupCmp(list[i], v);
         if (c === null) continue;
-        if (c <= 0) best = i; else break;
+        if (c === 0) return i;
+        if (c < 0) best = i; else break;
       }
-    } else {
-      for (let i = 0; i < list.length; i++) {
-        const c = lookupCmp(list[i], v);
-        if (c === null) continue;
-        if (c >= 0) best = i; else break;
-      }
+      return best;
+    }
+    const idx = [];
+    for (let i = 0; i < list.length; i++) if (lookupCmp(list[i], v) !== null) idx.push(i);
+    let lo = 0, hi = idx.length - 1, best = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const c = lookupCmp(list[idx[mid]], v);
+      if (c === 0) return idx[mid];
+      if (c > 0) { best = idx[mid]; lo = mid + 1; } else hi = mid - 1;
     }
     return best;
   }
@@ -968,9 +990,11 @@
     return approxFloor(a[0]);
   });
   def('MOD', 2, 2, function (nodes, ctx) {
-    const a = this.args(nodes, ctx, ['n', 'n']); if (isErr(a)) return a;
-    const [x, y] = a;
+    const vals = nodes.map((n) => this.sv(n, ctx));
+    for (const v of vals) if (isErr(v) && !v.fromRef) return v;
+    const y = this.toNum(vals[1]); if (isErr(y)) return y;
     if (y === 0) return E.DIV0;
+    const x = this.toNum(vals[0]); if (isErr(x)) return x;
     const q = x / y;
     if (!isFinite(q)) return E.NUM;
     let r = approxSub(x, approxFloor(q) * y);

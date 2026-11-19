@@ -19,3 +19,7 @@ Requires Node.js (>= 18). No dependencies, no build step.
 - `src/csv.js` — CSV import/export; `ui/` — the browser UI.
 - `tests/src/*.txt` — formula lists; `tests/cases/*.json` the workbooks built from them; `tests/expected/*.json` LibreOffice's results.
 - `tools/lo_oracle.py`, `tools/probe.sh` — dev-only: regenerate expected values with LibreOffice headless.
+
+## Known deviations
+
+Approximate-match lookups (`VLOOKUP(..., TRUE)`, `MATCH` with type 1 or -1) agree with LibreOffice on sorted data. On unsorted data LibreOffice's search order is idiosyncratic and is only approximated.
