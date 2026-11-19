@@ -1213,6 +1213,39 @@
     return a[0].replace(/^ +| +$/g, '').replace(/ {2,}/g, ' ');
   });
 
+  // ---- a few common extras beyond the spec's 40
+  def('PROPER', 1, 1, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['s']); if (isErr(a)) return a;
+    return a[0].toLowerCase().replace(/(^|[^A-Za-z\u00C0-\uFFFF])([a-z\u00C0-\uFFFF])/g, (m, p, c) => p + c.toUpperCase());
+  });
+  def('EXACT', 2, 2, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['s', 's']); if (isErr(a)) return a;
+    return a[0] === a[1];
+  });
+  def('VALUE', 1, 1, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['v']); if (isErr(a)) return a;
+    const v = a[0];
+    if (typeof v === 'number' || typeof v === 'boolean') return v;
+    if (v === null || v === EMPTYR) return E.VALUE;
+    const n = textToNum(String(v));
+    return n === null ? E.VALUE : n;
+  });
+  def('FIND', 2, 3, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['s', 's', 'n'], [undefined, undefined, 1]); if (isErr(a)) return a;
+    const st = Math.trunc(a[2]);
+    if (st < 1 || st > a[1].length + 1 || a[0] === '') return E.VALUE;
+    const i = a[1].indexOf(a[0], st - 1);
+    return i < 0 ? E.VALUE : i + 1;
+  });
+  def('SEARCH', 2, 3, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['s', 's', 'n'], [undefined, undefined, 1]); if (isErr(a)) return a;
+    const st = Math.trunc(a[2]);
+    if (st < 1 || st > a[1].length + 1) return E.VALUE;
+    const re = new RegExp(wildcardRe(a[0]).source.slice(1, -1), 'i');
+    const m = re.exec(a[1].slice(st - 1));
+    return m ? m.index + st : E.VALUE;
+  });
+
   // ---- lookup
   def('VLOOKUP', 3, 4, function (nodes, ctx) {
     const v = this.sv(nodes[0], ctx);
