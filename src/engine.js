@@ -46,7 +46,6 @@
     return Number(x.toPrecision(15));
   }
   const approxFloor = (x) => Math.floor(approxValue(x));
-  const approxCeil = (x) => Math.ceil(approxValue(x));
 
   function colName(c) { // 0-based
     let s = '';
@@ -916,7 +915,6 @@
     return best;
   }
 
-  function stripBlank(v) { return v === null ? 0 : v; }
 
   // ---------------------------------------------------------------- functions
   const FUNCS = {};
@@ -1081,7 +1079,7 @@
   def('COUNTIF', 2, 2, function (nodes, ctx) {
     const a = condArgs(this, nodes, ctx); if (isErr(a)) return a;
     let n = 0;
-    const rg = a.rg, sh = rg.sheet;
+    const rg = a.rg;
     if (a.match(null)) {
       // blanks match: count over the whole area, including cells beyond the used range
       const total = rg.rows * rg.cols;
@@ -1090,7 +1088,6 @@
       return total - nonBlank + nonBlankMatch;
     }
     this.eachCell(rg, (v) => { if (a.match(v)) n++; });
-    void sh;
     return n;
   });
 
@@ -1255,6 +1252,158 @@
     const re = new RegExp(wildcardRe(a[0]).source.slice(1, -1), 'i');
     const m = re.exec(a[1].slice(st - 1));
     return m ? m.index + st : E.VALUE;
+  });
+
+  def('ISNA', 1, 1, function (nodes, ctx) { const v = this.sv(nodes[0], ctx); return isErr(v) && v.code === '#N/A'; });
+  def('ISERR', 1, 1, function (nodes, ctx) { const v = this.sv(nodes[0], ctx); return isErr(v) && v.code !== '#N/A'; });
+  def('ISLOGICAL', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) === 'boolean'; });
+  def('ISNONTEXT', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) !== 'string'; });
+  def('SIGN', 1, 1, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['n']); if (isErr(a)) return a;
+    return a[0] > 0 ? 1 : a[0] < 0 ? -1 : 0;
+  });
+  def('TRUNC', 1, 2, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['n', 'n'], [undefined, 0]); if (isErr(a)) return a;
+    return roundTo(a[0], a[1], -1);
+  });
+  def('REPT', 2, 2, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['s', 'n']); if (isErr(a)) return a;
+    const n = Math.trunc(a[1]);
+    if (n < 0 || a[0].length * n > 32767) return E.VALUE;
+    return a[0].repeat(n);
+  });
+  def('SUBSTITUTE', 3, 4, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['s', 's', 's', 'n']); if (isErr(a)) return a;
+    const [t, from, to, nth] = a;
+    if (from === '') return t;
+    if (nth === undefined) return t.split(from).join(to);
+    const k = Math.trunc(nth);
+    if (k < 1) return E.VALUE;
+    let i = -1;
+    for (let j = 0; j < k; j++) { i = t.indexOf(from, i + 1); if (i < 0) return t; }
+    return t.slice(0, i) + to + t.slice(i + from.length);
+  });
+  def('CHAR', 1, 1, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['n']); if (isErr(a)) return a;
+    const n = Math.trunc(a[0]);
+    if (n < 1 || n > 255) return E.VALUE;
+    return n < 128 ? String.fromCharCode(n) : new TextDecoder('windows-1252').decode(new Uint8Array([n]));
+  });
+  def('CODE', 1, 1, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['s']); if (isErr(a)) return a;
+    return a[0] === '' ? E.VALUE : a[0].charCodeAt(0);
+  });
+  def('CHOOSE', 2, undefined, function (nodes, ctx) {
+    const a = this.args(nodes.slice(0, 1), ctx, ['n']); if (isErr(a)) return a;
+    const i = Math.trunc(a[0]);
+    if (i < 1 || i >= nodes.length) return E.VALUE;
+    const v = this.ev(nodes[i], ctx);
+    return v === MISSING ? 0 : v;
+  });
+  def('ROWS', 1, 1, function (nodes, ctx) {
+    const v = this.ev(nodes[0], ctx);
+    if (isErr(v)) return v;
+    return v instanceof Range || v instanceof Matrix ? v.rows : 1;
+  });
+  def('COLUMNS', 1, 1, function (nodes, ctx) {
+    const v = this.ev(nodes[0], ctx);
+    if (isErr(v)) return v;
+    return v instanceof Range || v instanceof Matrix ? v.cols : 1;
+  });
+  def('SUMPRODUCT', 1, undefined, function (nodes, ctx) {
+    const grids = [];
+    for (const n of nodes) {
+      const v = this.ev(n, ctx);
+      if (isErr(v)) return v;
+      grids.push(v instanceof Range ? this.grid(new Range(v.sheet, v.r1, v.c1, v.r2, v.c2)) : this.grid(v));
+    }
+    const R = grids[0].length, C = grids[0][0].length;
+    if (grids.some((g) => g.length !== R || g[0].length !== C)) return E.VALUE;
+    let sum = 0;
+    for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+      let p = 1;
+      for (const g of grids) {
+        const x = g[r][c];
+        if (isErr(x)) return x;
+        p *= typeof x === 'number' ? x : typeof x === 'boolean' ? +x : 0;
+      }
+      sum += p;
+    }
+    return sum;
+  });
+  // COUNTIFS / SUMIFS / AVERAGEIFS: all criteria ranges must have the same shape
+  function multiCond(self, nodes, ctx, first) {
+    const pairs = [];
+    for (let i = first; i + 1 < nodes.length; i += 2) {
+      const rg = self.ev(nodes[i], ctx);
+      if (isErr(rg)) return rg;
+      if (!(rg instanceof Range)) return E.VALUE;
+      let crit = self.sv(nodes[i + 1], ctx);
+      if (crit === MISSING) crit = null;
+      const m = makeCriterion(crit);
+      if (isErr(m)) return m;
+      pairs.push([rg, m]);
+    }
+    const R = pairs[0][0].rows, C = pairs[0][0].cols;
+    if (pairs.some(([rg]) => rg.rows !== R || rg.cols !== C)) return E.VALUE;
+    const hits = [];
+    const r2 = Math.min(R - 1, Math.max(...pairs.map(([rg]) => Math.max(rg.sheet.maxR - rg.r1, 0))));
+    const c2 = Math.min(C - 1, Math.max(...pairs.map(([rg]) => Math.max(rg.sheet.maxC - rg.c1, 0))));
+    for (let c = 0; c <= c2; c++) for (let r = 0; r <= r2; r++) {
+      if (pairs.every(([rg, m]) => { let v = self.cellValue(rg.sheet, rg.r1 + r, rg.c1 + c); if (v && v.emptyResult) v = 0; return m(v); })) hits.push([r, c]);
+    }
+    const blanksBeyond = pairs.every(([, m]) => m(null)) ? R * C - (r2 + 1) * (c2 + 1) : 0;
+    return { hits, blanksBeyond };
+  }
+  def('COUNTIFS', 2, undefined, function (nodes, ctx) {
+    if (nodes.length % 2) return E.VALUE;
+    const h = multiCond(this, nodes, ctx, 0); if (isErr(h)) return h;
+    return h.hits.length + h.blanksBeyond;
+  });
+  function sumIfs(self, nodes, ctx) {
+    if (nodes.length % 2 === 0) return E.VALUE;
+    const sr = self.ev(nodes[0], ctx);
+    if (isErr(sr)) return sr;
+    if (!(sr instanceof Range)) return E.VALUE;
+    const h = multiCond(self, nodes, ctx, 1); if (isErr(h)) return h;
+    const first = self.ev(nodes[1], ctx);
+    if (first.rows !== sr.rows || first.cols !== sr.cols) return E.VALUE;
+    const nums = [];
+    for (const [r, c] of h.hits) {
+      const v = self.cellValue(sr.sheet, sr.r1 + r, sr.c1 + c);
+      if (isErr(v)) return v;
+      if (typeof v === 'number') nums.push(v); else if (typeof v === 'boolean') nums.push(+v);
+    }
+    return nums;
+  }
+  def('SUMIFS', 3, undefined, function (nodes, ctx) {
+    const n = sumIfs(this, nodes, ctx); if (isErr(n)) return n;
+    return kahan(n);
+  });
+  def('AVERAGEIFS', 3, undefined, function (nodes, ctx) {
+    const n = sumIfs(this, nodes, ctx); if (isErr(n)) return n;
+    return n.length ? kahan(n) / n.length : E.DIV0;
+  });
+  def('HLOOKUP', 3, 4, function (nodes, ctx) {
+    const v = this.sv(nodes[0], ctx);
+    const tbl = this.ev(nodes[1], ctx);
+    const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
+    if (isErr(v) && !v.fromRef) return v;
+    if (isErr(tbl)) return tbl;
+    if (isErr(rest)) return rest;
+    if (isErr(v)) return v;
+    const row = Math.trunc(rest[0]);
+    const sorted = nodes.length > 3 && nodes[3].t === 'missing' ? false : rest[1];
+    if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return E.VALUE;
+    if (row < 1 || row > tbl.rows) return E.VALUE;
+    if (v === null) return E.NA;
+    const g = this.grid(tbl);
+    const i = lookupPos(g[0], v, sorted ? 1 : 0);
+    if (i < 0) return E.NA;
+    let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + row - 1, tbl.c1 + i) : g[row - 1][i];
+    if (out === EMPTYR) out = 0;
+    if (typeof out === 'boolean') return out ? 1 : 0;
+    return out === null ? 0 : out;
   });
 
   // ---- lookup
