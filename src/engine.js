@@ -700,7 +700,6 @@
     // opts.skipErrors: errors are ignored (COUNT)
     collect(nodes, ctx, opts) {
       const nums = [];
-      let allBool = true;
       const vals = [];
       for (const node of nodes) {
         if (node.t === 'missing') continue;
@@ -714,23 +713,32 @@
         if (v instanceof Range) {
           let err = null;
           this.eachCell(v, (x) => {
-            if (typeof x === 'number') { nums.push(x); allBool = false; } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
+            if (typeof x === 'number') { nums.push(x); } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
             else if (isErr(x) && !opts.skipErrors) { err = x; return false; }
             return true;
           });
           if (err) return { err };
         } else if (v instanceof Matrix) {
           for (const row of v.data) for (const x of row) {
-            if (typeof x === 'number') { nums.push(x); allBool = false; } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
+            if (typeof x === 'number') { nums.push(x); } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
             else if (isErr(x) && !opts.skipErrors) return { err: x };
           }
-        } else if (typeof v === 'number') { nums.push(v); allBool = false; } else if (typeof v === 'boolean') { nums.push(v ? 1 : 0); allBool = false; } else if (v === EMPTYR) { nums.push(0); allBool = false; } else if (isErr(v)) { if (!opts.skipErrors) return { err: v }; } else if (typeof v === 'string') {
+        } else if (typeof v === 'number') { nums.push(v); } else if (typeof v === 'boolean') { nums.push(v ? 1 : 0); } else if (v === EMPTYR) { nums.push(0); } else if (isErr(v)) { if (!opts.skipErrors) return { err: v }; } else if (typeof v === 'string') {
           const n = textToNum(v);
-          if (opts.countText) { if (n !== null) { nums.push(n); allBool = false; } } else return { err: E.VALUE };
+          if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: E.VALUE };
         }
       }
       nums.reverse();
-      return { nums, allBool: allBool && nums.length > 0 };
+      // MIN/MAX take the number format of the first value of the first
+      // parameter: a boolean cell there makes the result a boolean.
+      let boolFmt = false;
+      if (vals.length && vals[0] instanceof Range) {
+        this.eachCell(vals[0], (x) => {
+          if (typeof x === 'number' || typeof x === 'boolean') { boolFmt = typeof x === 'boolean'; return false; }
+          return true;
+        });
+      }
+      return { nums, boolFmt: boolFmt && nums.length > 0 };
     }
   }
 
@@ -916,7 +924,7 @@
     def(name, min === undefined ? 0 : min, undefined, function (nodes, ctx) {
       const r = this.collect(nodes, ctx, opts || {});
       if (r.err) return r.err;
-      return fn(r.nums, r.allBool);
+      return fn(r.nums, r.boolFmt);
     });
   }
 
@@ -933,8 +941,9 @@
 
   aggregate('SUM', (n) => finite(kahan(n)));
   aggregate('AVERAGE', (n) => (n.length ? finite(kahan(n) / n.length) : E.DIV0));
-  aggregate('MIN', (n, b) => (n.length ? (b ? !!Math.min(...n) : Math.min(...n)) : 0), {}, 1);
-  aggregate('MAX', (n, b) => (n.length ? (b ? !!Math.max(...n) : Math.max(...n)) : 0), {}, 1);
+  const asFmt = (x, b) => (b && (x === 0 || x === 1) ? x === 1 : x);
+  aggregate('MIN', (n, b) => (n.length ? asFmt(Math.min(...n), b) : 0), {}, 1);
+  aggregate('MAX', (n, b) => (n.length ? asFmt(Math.max(...n), b) : 0), {}, 1);
   aggregate('PRODUCT', (n) => (n.length ? finite(n.reduce((a, b) => a * b, 1)) : 0));
   aggregate('COUNT', (n) => n.length, { skipErrors: true, countText: true });
   aggregate('MEDIAN', (n) => {
