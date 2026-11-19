@@ -1108,9 +1108,16 @@
   function logical(name, init, combine) {
     def(name, 1, undefined, function (nodes, ctx) {
       let acc = init, any = false;
+      const vals = [];
       for (const node of nodes) {
         if (node.t === 'missing') continue;
         const v = this.ev(node, ctx);
+        if (isErr(v) && !v.fromRef) return v;
+        vals.push(v);
+      }
+      // parameters are examined last to first, as Calc pops them
+      for (let k = vals.length - 1; k >= 0; k--) {
+        const v = vals[k];
         if (v instanceof Range) {
           let err = null;
           this.eachCell(v, (x) => {
@@ -1125,7 +1132,7 @@
             if (typeof x === 'number' || typeof x === 'boolean') { acc = combine(acc, !!+x); any = true; }
           }
         } else if (isErr(v)) return v;
-        else if (typeof v === 'number' || typeof v === 'boolean') { acc = combine(acc, !!+v); any = true; } else if (typeof v === 'string') return E.VALUE;
+        else if (typeof v === 'number' || typeof v === 'boolean') { acc = combine(acc, !!+v); any = true; } else if (v === EMPTYR) { acc = combine(acc, false); any = true; } else if (typeof v === 'string') return E.VALUE;
       }
       return any ? acc : E.VALUE;
     });
