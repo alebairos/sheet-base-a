@@ -95,6 +95,9 @@
   function textToNum(s) {
     const t = s.trim();
     if (t === '') return null;
+    const u = t.toUpperCase();
+    if (u === 'TRUE') return 1;
+    if (u === 'FALSE') return 0;
     const m = NUMRE.exec(t);
     if (!m) return null;
     if (m[1] && m[3]) return null;
@@ -133,6 +136,9 @@
     get cols() { return this.data[0].length; }
   }
   const MISSING = { missing: true };
+  // result of calling an unknown function with arguments: #NAME?, but
+  // IFERROR/ISERROR turn it into #VALUE! instead of catching it
+  const UNKNOWN_FN = new FErr('#NAME?', false);
 
   // ---------------------------------------------------------------- tokenizer
   const ERRLITS = ['#DIV/0!', '#VALUE!', '#REF!', '#NAME?', '#N/A', '#NUM!', '#NULL!'];
@@ -151,7 +157,7 @@
         let s = '';
         i++;
         for (;;) {
-          if (i >= n) throw new SyntaxError('unterminated string');
+          if (i >= n) { const e = new SyntaxError('unterminated string'); e.code = '#NAME?'; throw e; }
           if (src[i] === '"') { if (src[i + 1] === '"') { s += '"'; i += 2; continue; } i++; break; }
           s += src[i++];
         }
@@ -248,7 +254,12 @@
     let p = 0;
     const peek = () => toks[p];
     const isOp = (v) => toks[p].t === 'op' && toks[p].v === v;
-    const expect = (v) => { if (!isOp(v)) throw new SyntaxError('expected ' + v); p++; };
+    // a missing ')' at the end is auto-closed, as Calc does
+    const expect = (v) => {
+      if (v === ')' && toks[p].t === 'eof') return;
+      if (!isOp(v)) throw new SyntaxError('expected ' + v);
+      p++;
+    };
 
     function comparison() {
       let a = concat();
@@ -298,10 +309,11 @@
       const list = [];
       if (isOp(')')) { p++; return list; }
       for (;;) {
-        if (isOp(',') || isOp(';')) { list.push({ t: 'missing' }); p++; continue; }
+        if (isOp(',')) { list.push({ t: 'missing' }); p++; continue; }
         if (isOp(')')) { list.push({ t: 'missing' }); p++; return list; }
+        if (toks[p].t === 'eof') return list;
         list.push(comparison());
-        if (isOp(',') || isOp(';')) { p++; if (isOp(')')) { list.push({ t: 'missing' }); p++; return list; } continue; }
+        if (isOp(',')) { p++; if (isOp(')')) { list.push({ t: 'missing' }); p++; return list; } continue; }
         expect(')');
         return list;
       }
@@ -349,7 +361,9 @@
           if (t.v === '+') return unary();
           break;
       }
-      throw new SyntaxError('unexpected token');
+      const e = new SyntaxError('unexpected token');
+      if (t.t === 'eof') e.code = '#N/A';
+      throw e;
     }
     const ast = comparison();
     if (peek().t !== 'eof') throw new SyntaxError('trailing input');
@@ -383,7 +397,7 @@
       const cell = { r, c, raw, addr: addr || addrName(r, c), state: 0, value: null, ast: null };
       if (typeof raw === 'string' && raw.charAt(0) === '=' && raw.length > 1) {
         cell.formula = true;
-        try { cell.ast = parse(raw.slice(1)); } catch (e) { cell.parseError = true; }
+        try { cell.ast = parse(raw.slice(1)); } catch (e) { cell.parseError = e.code || '#VALUE!'; }
       } else if (raw !== null && typeof raw === 'object') {
         cell.value = raw.error ? errByCode(raw.error) : null;
         cell.state = 2;
@@ -417,7 +431,7 @@
     evalCell(sh, cell) {
       cell.state = 1;
       let v;
-      if (cell.parseError || !cell.ast) v = cell.parseError ? this.parseErrorValue(cell) : null;
+      if (cell.parseError || !cell.ast) v = cell.parseError ? errByCode(cell.parseError) : null;
       else {
         const ctx = { sheet: sh, r: cell.r, c: cell.c };
         try {
@@ -433,9 +447,6 @@
       cell.state = 2;
     }
 
-    parseErrorValue(cell) {
-      return /^=\s*[A-Za-z_][\w.]*\s*\(/.test(cell.raw) && !/[()]/.test(cell.raw.replace(/^=\s*[A-Za-z_][\w.]*\s*\(/, '').slice(-1)) ? E.VALUE : E.NAME;
-    }
 
     finalValue(v, ctx) {
       if (v instanceof Range) v = this.intersect(v, ctx);
@@ -633,7 +644,7 @@
     // ---- function calls
     call(node, ctx) {
       const f = FUNCS[node.name];
-      if (!f) return E.NAME;
+      if (!f) return node.args.length ? UNKNOWN_FN : E.NAME;
       const n = node.args.length;
       if (n < f.min || (f.max !== undefined && n > f.max)) return E.VALUE;
       return f.fn.call(this, node.args, ctx);
@@ -863,8 +874,8 @@
   const FUNCS = {};
   function def(name, min, max, fn) { FUNCS[name] = { min, max, fn }; }
 
-  function aggregate(name, fn, opts) {
-    def(name, 1, undefined, function (nodes, ctx) {
+  function aggregate(name, fn, opts, min) {
+    def(name, min === undefined ? 0 : min, undefined, function (nodes, ctx) {
       const r = this.collect(nodes, ctx, opts || {});
       if (r.err) return r.err;
       return fn(r.nums, r.allBool);
@@ -884,8 +895,8 @@
 
   aggregate('SUM', (n) => finite(kahan(n)));
   aggregate('AVERAGE', (n) => (n.length ? finite(kahan(n) / n.length) : E.DIV0));
-  aggregate('MIN', (n, b) => (n.length ? (b ? !!Math.min(...n) : Math.min(...n)) : 0));
-  aggregate('MAX', (n, b) => (n.length ? (b ? !!Math.max(...n) : Math.max(...n)) : 0));
+  aggregate('MIN', (n, b) => (n.length ? (b ? !!Math.min(...n) : Math.min(...n)) : 0), {}, 1);
+  aggregate('MAX', (n, b) => (n.length ? (b ? !!Math.max(...n) : Math.max(...n)) : 0), {}, 1);
   aggregate('PRODUCT', (n) => (n.length ? finite(n.reduce((a, b) => a * b, 1)) : 0));
   aggregate('COUNT', (n) => n.length, { skipErrors: true, countText: true });
   aggregate('MEDIAN', (n) => {
@@ -893,7 +904,7 @@
     const s = n.slice().sort((a, b) => a - b);
     const m = s.length >> 1;
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-  });
+  }, {}, 1);
   aggregate('STDEV', (n) => {
     if (n.length < 2) return E.DIV0;
     const mean = kahan(n) / n.length;
@@ -901,7 +912,7 @@
     return Math.sqrt(ss / (n.length - 1));
   });
 
-  def('COUNTA', 1, undefined, function (nodes, ctx) {
+  def('COUNTA', 0, undefined, function (nodes, ctx) {
     let n = 0;
     for (const node of nodes) {
       if (node.t === 'missing') continue;
@@ -1049,6 +1060,7 @@
   def('IFERROR', 2, 2, function (nodes, ctx) {
     const v = this.ev(nodes[0], ctx);
     const s = this.scalar(v, ctx);
+    if (s === UNKNOWN_FN) return E.VALUE;
     if (isErr(s)) { const alt = this.ev(nodes[1], ctx); return alt === MISSING ? 0 : alt; }
     return v instanceof Range || v instanceof Matrix ? stripBlank(s) : stripBlank(v === MISSING ? 0 : v);
   });
@@ -1092,10 +1104,13 @@
     return typeof v === 'number' || typeof v === 'boolean';
   });
   def('ISTEXT', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) === 'string'; });
-  def('ISERROR', 1, 1, function (nodes, ctx) { return isErr(this.sv(nodes[0], ctx)); });
+  def('ISERROR', 1, 1, function (nodes, ctx) {
+    const v = this.sv(nodes[0], ctx);
+    return v === UNKNOWN_FN ? E.VALUE : isErr(v);
+  });
 
   // ---- text
-  def('CONCATENATE', 1, undefined, function (nodes, ctx) {
+  def('CONCATENATE', 0, undefined, function (nodes, ctx) {
     const vals = nodes.map((n) => this.sv(n, ctx));
     for (const v of vals) if (isErr(v) && !v.fromRef) return v;
     let s = '';
@@ -1154,7 +1169,7 @@
     const sorted = nodes.length > 3 && nodes[3].t === 'missing' ? false : rest[1];
     if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return E.VALUE;
     if (col < 1) return E.VALUE;
-    if (col > tbl.cols) return E.REF;
+    if (col > tbl.cols) return E.VALUE;
     if (v === null) return E.NA;
     const g = this.grid(tbl);
     const first = g.map((row) => row[0]);
@@ -1173,7 +1188,7 @@
     if (isErr(rest)) return rest;
     if (isErr(v)) return v;
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.NA;
-    if (rg.rows !== 1 && rg.cols !== 1) return E.NA;
+    if (rg.rows !== 1 && rg.cols !== 1) return E.VALUE;
     if (v === null) return E.NA;
     const g = this.grid(rg);
     const list = rg.cols === 1 ? g.map((row) => row[0]) : g[0];
