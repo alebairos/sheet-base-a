@@ -904,6 +904,8 @@
     }
     const idx = [];
     for (let i = 0; i < list.length; i++) if (lookupCmp(list[i], v) !== null) idx.push(i);
+    // data that starts below the value cannot be in descending order
+    if (!idx.length || lookupCmp(list[idx[0]], v) < 0) return -1;
     let lo = 0, hi = idx.length - 1, best = -1;
     while (lo <= hi) {
       const mid = (lo + hi) >> 1;
