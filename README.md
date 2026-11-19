@@ -14,11 +14,18 @@ Requires Node.js (>= 18). No dependencies, no build step.
 
 ## Layout
 
-- `src/engine.js` — tokenizer, parser, evaluator and the 40 functions (runs in Node and in the browser).
+- `src/engine.js` — tokenizer, parser, evaluator and the functions (runs in Node and in the browser): the spec's 40, plus PI, COUNTBLANK, PROPER, EXACT, VALUE, FIND, SEARCH, ISNA, ISERR, ISLOGICAL, ISNONTEXT, SIGN, TRUNC, REPT, SUBSTITUTE, CHAR, CODE, CHOOSE, ROWS, COLUMNS, SUMPRODUCT, COUNTIFS, SUMIFS, AVERAGEIFS, HLOOKUP.
 - `bin/engine` — the CLI.
 - `src/csv.js` — CSV import/export; `ui/` — the browser UI.
 - `tests/src/*.txt` — formula lists; `tests/cases/*.json` the workbooks built from them; `tests/expected/*.json` LibreOffice's results.
 - `tools/lo_oracle.py`, `tools/probe.sh` — dev-only: regenerate expected values with LibreOffice headless.
+
+## Semantics notes
+
+- Expected values come from LibreOffice recalculating the workbook and writing it out (the oracle in `tools/lo_oracle.py` round-trips through xlsx). In that output Calc's internal errors without an Excel name — `Err:502` (invalid argument, e.g. `SQRT(-1)`, `MID("abc",0,1)`) and `Err:522` (circular reference) — appear as `#VALUE!`, and the engine reports them the same way.
+- Numbers in the output are rounded to 15 significant digits, as Calc stores them in files.
+- Booleans are numbers with a boolean format, as in Calc: `TRUE+1` is 2, `TRUE&""` is `"1"`, and a result is reported as `true`/`false` when Calc would format it as a boolean.
+- An empty text constant (`""`) in the input is an empty cell.
 
 ## Known deviations
 
