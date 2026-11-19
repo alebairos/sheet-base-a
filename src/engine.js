@@ -139,6 +139,9 @@
   // result of calling an unknown function with arguments: #NAME?, but
   // IFERROR/ISERROR turn it into #VALUE! instead of catching it
   const UNKNOWN_FN = new FErr('#NAME?', false);
+  // value of a formula whose result is an empty cell (e.g. =B1 with B1 empty):
+  // shown as 0, but compares like an empty cell and is neither number nor text
+  const EMPTYR = { emptyResult: true };
 
   // ---------------------------------------------------------------- tokenizer
   const ERRLITS = ['#DIV/0!', '#VALUE!', '#REF!', '#NAME?', '#N/A', '#NUM!', '#NULL!'];
@@ -451,7 +454,8 @@
     finalValue(v, ctx) {
       if (v instanceof Range) v = this.intersect(v, ctx);
       else if (v instanceof Matrix) v = v.data[0][0];
-      if (v === null || v === MISSING) return 0;
+      if (v === null) return EMPTYR;
+      if (v === MISSING) return 0;
       if (typeof v === 'number') {
         if (!isFinite(v)) return E.NUM;
         return v;
@@ -499,13 +503,15 @@
         }
         list.sort((x, y) => x.c - y.c || x.r - y.r);
         for (const cell of list) {
-          if (fn(this.cellValue(sh, cell.r, cell.c), cell.r, cell.c) === false) return;
+          const v = this.cellValue(sh, cell.r, cell.c);
+          if (fn(v === EMPTYR ? 0 : v, cell.r, cell.c) === false) return;
         }
         return;
       }
       for (let c = rg.c1; c <= c2; c++) {
         for (let r = rg.r1; r <= r2; r++) {
-          const v = this.cellValue(sh, r, c);
+          let v = this.cellValue(sh, r, c);
+          if (v === EMPTYR) v = 0;
           if (v === null && !includeBlank) continue;
           if (fn(v, r, c) === false) return;
         }
@@ -520,7 +526,7 @@
         const out = [];
         for (let r = v.r1; r <= r2; r++) {
           const row = [];
-          for (let c = v.c1; c <= c2; c++) row.push(this.cellValue(v.sheet, r, c));
+          for (let c = v.c1; c <= c2; c++) { const x = this.cellValue(v.sheet, r, c); row.push(x === EMPTYR ? 0 : x); }
           out.push(row);
         }
         return out;
@@ -578,7 +584,7 @@
     toNum(v) {
       if (typeof v === 'number') return v;
       if (typeof v === 'boolean') return v ? 1 : 0;
-      if (v === null || v === MISSING) return 0;
+      if (v === null || v === MISSING || v === EMPTYR) return 0;
       if (isErr(v)) return v;
       if (typeof v === 'string') {
         const n = textToNum(v);
@@ -591,13 +597,14 @@
       if (typeof v === 'number') return fmtNum(v);
       if (typeof v === 'boolean') return v ? '1' : '0';
       if (v === null || v === MISSING) return '';
+      if (v === EMPTYR) return '0';
       if (isErr(v)) return v;
       return E.VALUE;
     }
     toBool(v) {
       if (typeof v === 'boolean') return v;
       if (typeof v === 'number') return v !== 0;
-      if (v === null || v === MISSING) return false;
+      if (v === null || v === MISSING || v === EMPTYR) return false;
       if (isErr(v)) return v;
       if (typeof v === 'string') {
         const n = textToNum(v);
@@ -743,6 +750,8 @@
 
   // compare two non-error scalars as Calc's comparison operators do
   function compare(a, b) {
+    if (a === EMPTYR) a = null;
+    if (b === EMPTYR) b = null;
     if (a === null || a === MISSING) a = typeof b === 'string' ? '' : 0;
     if (b === null || b === MISSING) b = typeof a === 'string' ? '' : 0;
     if (typeof a === 'boolean') a = a ? 1 : 0;
@@ -783,9 +792,9 @@
     if (typeof c === 'number') {
       return (v) => (typeof v === 'number' || typeof v === 'boolean') && approxEqual(+v, c);
     }
-    let s = String(c), op = '=';
+    let s = String(c), op = '=', explicitEq = false;
     for (const o of ['<=', '>=', '<>', '<', '>', '=']) {
-      if (s.startsWith(o)) { op = o; s = s.slice(o.length); break; }
+      if (s.startsWith(o)) { op = o; s = s.slice(o.length); explicitEq = o === '='; break; }
     }
     const num = textToNum(s);
     if (num !== null) {
@@ -801,7 +810,7 @@
     }
     if (op === '=' || op === '<>') {
       let match;
-      if (s === '') match = (v) => v === null || v === '';
+      if (s === '') match = op === '=' && !explicitEq ? (v) => v === null || v === '' : (v) => v === null;
       else if (hasWild(s)) { const re = wildcardRe(s); match = (v) => v !== null && re.test(cellText(v)); }
       else match = (v) => v !== null && strEq(cellText(v), s);
       if (op === '=') return match;
@@ -1006,7 +1015,8 @@
     const blankMatches = a.match(null);
     const visit = (v, r, c) => {
       if (!a.match(v)) return true;
-      const sv = self.cellValue(a.sum.sheet, a.sum.r1 + (r - a.rg.r1), a.sum.c1 + (c - a.rg.c1));
+      let sv = self.cellValue(a.sum.sheet, a.sum.r1 + (r - a.rg.r1), a.sum.c1 + (c - a.rg.c1));
+      if (sv === EMPTYR) sv = 0;
       if (typeof sv === 'number') nums.push(sv);
       else if (typeof sv === 'boolean') nums.push(sv ? 1 : 0);
       else if (isErr(sv)) { err = sv; return false; }
@@ -1098,6 +1108,15 @@
   def('TRUE', 0, 0, () => true);
   def('FALSE', 0, 0, () => false);
   def('NA', 0, 0, () => E.NA);
+  def('PI', 0, 0, () => Math.PI);
+  def('COUNTBLANK', 1, 1, function (nodes, ctx) {
+    const rg = this.ev(nodes[0], ctx);
+    if (isErr(rg)) return rg;
+    if (!(rg instanceof Range)) return E.VALUE;
+    let nonBlank = 0;
+    this.eachCell(rg, (v) => { if (v !== '') nonBlank++; });
+    return rg.rows * rg.cols - nonBlank;
+  });
   def('ISBLANK', 1, 1, function (nodes, ctx) { return this.sv(nodes[0], ctx) === null; });
   def('ISNUMBER', 1, 1, function (nodes, ctx) {
     const v = this.sv(nodes[0], ctx);
@@ -1175,7 +1194,8 @@
     const first = g.map((row) => row[0]);
     const i = lookupPos(first, v, sorted ? 1 : 0);
     if (i < 0) return E.NA;
-    const out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + i, tbl.c1 + col - 1) : g[i][col - 1];
+    let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + i, tbl.c1 + col - 1) : g[i][col - 1];
+    if (out === EMPTYR) out = 0;
     if (typeof out === 'boolean') return out ? 1 : 0;
     return out === null ? 0 : out;
   });
@@ -1225,6 +1245,7 @@
 
   // ---------------------------------------------------------------- public API
   function outValue(v) {
+    if (v === EMPTYR || v === null) return 0;
     if (isErr(v)) return { error: v.code };
     if (typeof v === 'number') {
       if (!isFinite(v)) return { error: '#NUM!' };
