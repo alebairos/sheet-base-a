@@ -188,7 +188,7 @@
         if (src[j] !== '!') throw new SyntaxError('expected !');
         sheet = s; j++;
       } else {
-        const m = /^([A-Za-z_À-￿][\w.À-￿]*)!/.exec(src.slice(i));
+        const m = /^([A-Za-z_\u00C0-\uFFFF][\w.\u00C0-\uFFFF]*)!/.exec(src.slice(i));
         if (m) { sheet = m[1]; j = i + m[0].length; }
       }
       const rest = src.slice(j);
@@ -235,8 +235,8 @@
         i += m[0].length;
         continue;
       }
-      if (/[A-Za-z_À-￿]/.test(ch)) {
-        const m = /^[A-Za-z_À-￿][\w.À-￿]*/.exec(src.slice(i));
+      if (/[A-Za-z_\u00C0-\uFFFF]/.test(ch)) {
+        const m = /^[A-Za-z_\u00C0-\uFFFF][\w.\u00C0-\uFFFF]*/.exec(src.slice(i));
         toks.push({ t: 'name', v: m[0] });
         i += m[0].length;
         continue;

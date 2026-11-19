@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>pending</title>
+<script>window.onerror = (m, s, l) => { document.title = 'FAIL error ' + m + ' at ' + s + ':' + l; };</script>
+</head><body>
+<!-- Same element ids as ui/index.html; the app script drives them. -->
+<span id="status"></span><button id="btn-new"></button><input id="file-open" type="file">
+<button id="btn-save-json"></button><button id="btn-save-csv"></button>
+<input id="name-box"><input id="formula-input"><span id="cell-info"></span>
+<main id="grid-wrap" tabindex="0"><table id="grid"></table></main>
+<div id="sheet-tabs"></div><button id="btn-add-sheet"></button>
+<script src="../../src/engine.js"></script>
+<script src="../../src/csv.js"></script>
+<script src="../../ui/app.js"></script>
+<script src="smoke.js"></script>
+</body></html>

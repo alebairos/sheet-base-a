@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sheet</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="toolbar">
+  <strong class="brand">Sheet</strong>
+  <button id="btn-new" title="New workbook">New</button>
+  <label class="btn" title="Open a .json workbook or a .csv file">Open…<input id="file-open" type="file" accept=".json,.csv,.txt,application/json,text/csv" hidden></label>
+  <button id="btn-save-json" title="Save the workbook as JSON (formulas kept)">Save JSON</button>
+  <button id="btn-save-csv" title="Save the current sheet as CSV (computed values)">Save CSV</button>
+  <span id="status" class="status"></span>
+</header>
+<div class="formula-bar">
+  <input id="name-box" class="name-box" aria-label="Cell address" spellcheck="false">
+  <span class="fx">fx</span>
+  <input id="formula-input" class="formula-input" aria-label="Formula" spellcheck="false" autocomplete="off">
+  <span id="cell-info" class="cell-info"></span>
+</div>
+<main id="grid-wrap" class="grid-wrap" tabindex="0">
+  <table id="grid" class="grid"></table>
+</main>
+<footer class="tabs">
+  <div id="sheet-tabs" class="sheet-tabs"></div>
+  <button id="btn-add-sheet" title="Add sheet">+</button>
+</footer>
+<script src="../src/engine.js"></script>
+<script src="../src/csv.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
