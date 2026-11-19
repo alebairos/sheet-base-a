@@ -30,3 +30,4 @@ Requires Node.js (>= 18). No dependencies, no build step.
 ## Known deviations
 
 Approximate-match lookups (`VLOOKUP(..., TRUE)`, `MATCH` with type 1 or -1) agree with LibreOffice on sorted data. On unsorted data LibreOffice's search order is idiosyncratic and is only approximated.
+When a single function call meets several different errors at once (for example an error argument and an invalid argument), LibreOffice's choice of which error to report depends on interpreter internals; the engine follows the common cases (first error computed, then arguments examined last to first) but not every combination.
