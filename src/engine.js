@@ -426,7 +426,9 @@
       const cell = sh.cells.get(r * MAXCOL + c);
       if (!cell) return null;
       if (cell.state === 2) return cell.value;
-      if (cell.state === 1) { cell.circular = true; return E.VALUE; }
+      // A cell that is being computed reads as an error (Calc's Err:522, which
+      // round-trips as #VALUE!); the error then propagates through the cycle.
+      if (cell.state === 1) return EREF['#VALUE!'];
       this.evalCell(sh, cell);
       return cell.value;
     }
@@ -444,7 +446,6 @@
           else throw e;
         }
       }
-      if (cell.circular) v = E.VALUE;
       if (isErr(v)) v = asComputed(v);
       cell.value = v;
       cell.state = 2;
@@ -723,8 +724,7 @@
             if (typeof x === 'number') { nums.push(x); allBool = false; } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
             else if (isErr(x) && !opts.skipErrors) return { err: x };
           }
-        } else if (typeof v === 'number') { nums.push(v); allBool = false; } else if (typeof v === 'boolean') nums.push(v ? 1 : 0);
-        else if (v === EMPTYR) { nums.push(0); allBool = false; } else if (isErr(v)) { if (!opts.skipErrors) return { err: v }; } else if (typeof v === 'string') {
+        } else if (typeof v === 'number') { nums.push(v); allBool = false; } else if (typeof v === 'boolean') { nums.push(v ? 1 : 0); allBool = false; } else if (v === EMPTYR) { nums.push(0); allBool = false; } else if (isErr(v)) { if (!opts.skipErrors) return { err: v }; } else if (typeof v === 'string') {
           const n = textToNum(v);
           if (opts.countText) { if (n !== null) { nums.push(n); allBool = false; } } else return { err: E.VALUE };
         }
@@ -1103,7 +1103,7 @@
     const s = this.scalar(v, ctx);
     if (s === UNKNOWN_FN) return E.VALUE;
     if (isErr(s)) { const alt = this.ev(nodes[1], ctx); return alt === MISSING ? 0 : alt; }
-    return v instanceof Range || v instanceof Matrix ? stripBlank(s) : stripBlank(v === MISSING ? 0 : v);
+    return v === MISSING ? 0 : v;
   });
   function logical(name, init, combine) {
     def(name, 1, undefined, function (nodes, ctx) {
@@ -1328,11 +1328,7 @@
 
   function computeWorkbook(json) {
     const eng = new Engine(json);
-    // evaluate in dependency-friendly order to keep recursion shallow
-    for (const sh of eng.wb.sheets) {
-      const order = topoOrder(eng, sh);
-      for (const cell of order) eng.cellValue(sh, cell.r, cell.c);
-    }
+    recalcAll(eng);
     const out = { sheets: {} };
     for (const sh of eng.wb.sheets) {
       const cells = {};
@@ -1349,49 +1345,96 @@
     return out;
   }
 
-  // Order formula cells so that static precedents come first (iterative DFS).
-  function topoOrder(eng, sh) {
-    const res = [];
-    const seen = new Set();
-    const precedents = (cell) => {
-      const out = [];
-      const walk = (node) => {
-        if (!node || typeof node !== 'object') return;
-        if (node.t === 'ref') {
-          const s = node.sheet === null ? sh : eng.wb.sheet(node.sheet);
-          if (!s || s !== sh) return;
-          const b = node.b || node.a;
-          const r1 = Math.min(node.a.r, b.r), r2 = Math.min(Math.max(node.a.r, b.r), s.maxR);
-          const c1 = Math.min(node.a.c, b.c), c2 = Math.min(Math.max(node.a.c, b.c), s.maxC);
-          if ((r2 - r1 + 1) * (c2 - c1 + 1) > 4 * s.cells.size) {
-            for (const c of s.cells.values()) if (c.formula && c.r >= r1 && c.r <= r2 && c.c >= c1 && c.c <= c2) out.push(c);
-          } else {
-            for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) {
-              const x = s.cells.get(r * MAXCOL + c);
-              if (x && x.formula) out.push(x);
-            }
-          }
-          return;
+  // Recalculate every formula cell.
+  // Cells that are not on (or downstream of) a reference cycle get the same
+  // value in any order, so they are computed in dependency order, which keeps
+  // recursion shallow even for long chains. Cells on or after a cycle depend on
+  // where the cycle is entered, so they are computed the way Calc does it:
+  // sheet by sheet, column by column, row by row, recursing into precedents.
+  function recalcAll(eng) {
+    const formulas = [];
+    eng.wb.sheets.forEach((sh, si) => {
+      for (const cell of sh.cells.values()) if (cell.formula) { cell.sheet = sh; cell.si = si; formulas.push(cell); }
+    });
+    const deps = new Map();
+    for (const cell of formulas) deps.set(cell, staticPrecedents(eng, cell));
+
+    // Tarjan's strongly connected components, iterative.
+    let index = 0;
+    const idx = new Map(), low = new Map(), onStack = new Set(), stack = [], order = [], cyclic = new Set();
+    for (const root of formulas) {
+      if (idx.has(root)) continue;
+      const work = [[root, 0]];
+      idx.set(root, index); low.set(root, index); index++; stack.push(root); onStack.add(root);
+      while (work.length) {
+        const top = work[work.length - 1];
+        const [v, i] = top;
+        const ds = deps.get(v);
+        if (i < ds.length) {
+          top[1]++;
+          const w = ds[i];
+          if (!idx.has(w)) {
+            idx.set(w, index); low.set(w, index); index++; stack.push(w); onStack.add(w);
+            work.push([w, 0]);
+          } else if (onStack.has(w)) low.set(v, Math.min(low.get(v), idx.get(w)));
+          continue;
         }
-        for (const k of ['a', 'b']) if (node[k] && node[k].t) walk(node[k]);
-        if (node.args) node.args.forEach(walk);
-      };
-      walk(cell.ast);
-      return out;
-    };
-    for (const start of sh.cells.values()) {
-      if (!start.formula || seen.has(start)) continue;
-      const stack = [[start, null]];
-      seen.add(start);
-      while (stack.length) {
-        const top = stack[stack.length - 1];
-        if (top[1] === null) top[1] = precedents(top[0]);
-        const next = top[1].pop();
-        if (next === undefined) { res.push(top[0]); stack.pop(); continue; }
-        if (!seen.has(next)) { seen.add(next); stack.push([next, null]); }
+        work.pop();
+        if (work.length) { const u = work[work.length - 1][0]; low.set(u, Math.min(low.get(u), low.get(v))); }
+        if (low.get(v) === idx.get(v)) {
+          const comp = [];
+          let w;
+          do { w = stack.pop(); onStack.delete(w); comp.push(w); } while (w !== v);
+          if (comp.length > 1 || deps.get(v).indexOf(v) >= 0) comp.forEach((c) => cyclic.add(c));
+          order.push(...comp);
+        }
       }
     }
-    return res;
+    // taint everything downstream of a cycle
+    const tainted = new Set(cyclic);
+    if (cyclic.size) {
+      const users = new Map();
+      for (const [c, ds] of deps) for (const d of ds) { if (!users.has(d)) users.set(d, []); users.get(d).push(c); }
+      const queue = [...cyclic];
+      while (queue.length) {
+        const c = queue.pop();
+        for (const u of users.get(c) || []) if (!tainted.has(u)) { tainted.add(u); queue.push(u); }
+      }
+    }
+    for (const cell of order) if (!tainted.has(cell)) eng.cellValue(cell.sheet, cell.r, cell.c);
+    if (tainted.size) {
+      const rest = [...tainted].sort((a, b) => a.si - b.si || a.c - b.c || a.r - b.r);
+      for (const cell of rest) eng.cellValue(cell.sheet, cell.r, cell.c);
+    }
+  }
+
+  // Formula cells a formula may read, from its references (an over-approximation).
+  function staticPrecedents(eng, cell) {
+    const out = [];
+    const seen = new Set();
+    const add = (x) => { if (x && x.formula && !seen.has(x)) { seen.add(x); out.push(x); } };
+    const walk = (node) => {
+      if (!node || typeof node !== 'object') return;
+      if (node.t === 'ref') {
+        const s = node.sheet === null ? cell.sheet : eng.wb.sheet(node.sheet);
+        if (!s) return;
+        const b = node.b || node.a;
+        const r1 = Math.min(node.a.r, b.r), r2 = Math.min(Math.max(node.a.r, b.r), s.maxR);
+        const c1 = Math.min(node.a.c, b.c), c2 = Math.min(Math.max(node.a.c, b.c), s.maxC);
+        if (r2 < r1 || c2 < c1) return;
+        if ((r2 - r1 + 1) * (c2 - c1 + 1) > s.cells.size) {
+          for (const x of s.cells.values()) if (x.r >= r1 && x.r <= r2 && x.c >= c1 && x.c <= c2) add(x);
+        } else {
+          for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) add(s.cells.get(r * MAXCOL + c));
+        }
+        return;
+      }
+      if (node.a && node.a.t) walk(node.a);
+      if (node.b && node.b.t) walk(node.b);
+      if (node.args) node.args.forEach(walk);
+    };
+    walk(cell.ast);
+    return out;
   }
 
   const api = {
