@@ -1,0 +1,58 @@
+#!/usr/bin/env node
+'use strict';
+// Engine CLI: engine <file|-> [--cell Sheet1!A1]
+const fs = require('fs');
+const path = require('path');
+const { computeWorkbook, parseAddr } = require(path.join(__dirname, '..', 'src', 'engine.js'));
+
+function usage() {
+  process.stderr.write('usage: engine <file|-> [--cell Sheet!A1]\n');
+  process.exit(2);
+}
+
+const argv = process.argv.slice(2);
+let file = null, cell = null;
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (a === '--cell') cell = argv[++i];
+  else if (a.startsWith('--cell=')) cell = a.slice(7);
+  else if (file === null) file = a;
+  else usage();
+}
+if (file === null) usage();
+
+let text;
+try {
+  text = file === '-' ? fs.readFileSync(0, 'utf8') : fs.readFileSync(file, 'utf8');
+} catch (e) {
+  process.stderr.write(`engine: cannot read ${file}: ${e.message}\n`);
+  process.exit(1);
+}
+let wb;
+try { wb = JSON.parse(text); } catch (e) {
+  process.stderr.write(`engine: invalid JSON: ${e.message}\n`);
+  process.exit(1);
+}
+
+const out = computeWorkbook(wb);
+if (cell === null) {
+  process.stdout.write(JSON.stringify(out) + '\n');
+} else {
+  const m = /^(?:'((?:[^']|'')+)'|([^!]+))!(.+)$/.exec(cell);
+  let sheetName, addr;
+  if (m) { sheetName = m[1] !== undefined ? m[1].replace(/''/g, "'") : m[2]; addr = m[3]; } else {
+    sheetName = Object.keys(out.sheets)[0]; addr = cell;
+  }
+  const key = Object.keys(out.sheets).find((k) => k.toUpperCase() === String(sheetName).toUpperCase());
+  if (key === undefined) {
+    process.stderr.write(`engine: no such sheet: ${sheetName}\n`);
+    process.exit(1);
+  }
+  const a = addr.replace(/\$/g, '').toUpperCase();
+  if (!parseAddr(a)) {
+    process.stderr.write(`engine: bad cell address: ${addr}\n`);
+    process.exit(1);
+  }
+  const v = Object.prototype.hasOwnProperty.call(out.sheets[key], a) ? out.sheets[key][a] : null;
+  process.stdout.write(JSON.stringify(v) + '\n');
+}

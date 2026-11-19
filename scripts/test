@@ -1,0 +1,6 @@
+#!/bin/sh
+# Whole test suite: engine fixtures (expected values computed by LibreOffice) + CLI checks.
+set -e
+cd "$(dirname "$0")/.."
+node tests/run.js
+node tests/cli.js
