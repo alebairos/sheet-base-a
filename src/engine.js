@@ -564,13 +564,14 @@
         }
         case 'neg': {
           let depth = 1, inner = node.a;
-          while (inner.t === 'neg') { depth++; inner = inner.a; }
+          while (inner.t === 'neg' || inner.t === 'paren') { if (inner.t === 'neg') depth++; inner = inner.a; }
           const v = this.sv(inner, ctx);
           const n = this.toNum(v);
           if (isErr(n)) return asComputed(n);
           const r = depth % 2 ? -n : n;
           // Calc keeps the boolean number format through negation
-          if (typeof v === 'boolean' && (r === 0 || r === 1)) return r === 1;
+          // (but not for a plain cell reference)
+          if (typeof v === 'boolean' && inner.t !== 'ref' && (r === 0 || r === 1)) return r === 1;
           return r === 0 ? 0 : r;
         }
         case 'pct': {
@@ -845,9 +846,14 @@
   function lookupEq(v, x) {
     if (x === null) return false;
     if (typeof v === 'boolean') v = v ? 1 : 0;
-    if (typeof x === 'boolean') x = x ? 1 : 0;
-    if (typeof v === 'number') return typeof x === 'number' && approxEqual(v, x);
+    if (typeof v === 'number') {
+      if (typeof x === 'boolean') x = x ? 1 : 0;
+      return typeof x === 'number' && approxEqual(v, x);
+    }
     if (typeof v === 'string') {
+      // text is compared with the cell's displayed text (numbers too)
+      if (typeof x === 'number') x = fmtNum(x);
+      else if (typeof x === 'boolean') x = x ? 'TRUE' : 'FALSE';
       if (typeof x !== 'string') return false;
       if (hasWild(v)) return wildcardRe(v).test(x);
       return strEq(v, x);
@@ -883,7 +889,8 @@
         const c = lookupCmp(list[i], v);
         if (c === null) continue;
         if (c === 0) return i;
-        if (c < 0) best = i; else break;
+        if (c < 0) best = i;
+        else if (best >= 0 || typeof v === 'number') break;
       }
       return best;
     }
