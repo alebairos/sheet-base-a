@@ -1676,7 +1676,7 @@
           if (!node.b) rg.single = true; // (Calc's single reference: a scalar in an array context too)
           // (a range written bottom-up or right-to-left keeps its corners as
           // written after LibreOffice's xlsx import: intersecting it is empty)
-          if (node.b && (node.a.r > b.r || node.a.c > b.c)) rg.rev = true;
+          if (node.b && (node.a.r > b.r || node.a.c > b.c)) { rg.rev = true; rg.wr = [node.a.r, node.a.c, b.r, b.c]; }
           return rg;
         }
         case 'ref3d': {
@@ -2809,7 +2809,12 @@
       }
       if (s instanceof Matrix) return { rg, match, sum: s };
       if (!(s instanceof Range)) return E.VALUE;
-      sum = new Range(s.sheet, s.r1, s.c1, s.r1 + rg.rows - 1, s.c1 + rg.cols - 1);
+      // (a sum range written reversed, x then y with x > y along a dimension,
+      // starts at y + min(d, n-1-d) there (d = x-y, n the criteria size), as
+      // LibreOffice's xlsx import makes it)
+      const st = (x, y, lo, n) => (x > y ? y + Math.min(x - y, Math.max(0, n - 1 - (x - y))) : lo);
+      const r0 = s.wr ? st(s.wr[0], s.wr[2], s.r1, rg.rows) : s.r1, c0 = s.wr ? st(s.wr[1], s.wr[3], s.c1, rg.cols) : s.c1;
+      sum = new Range(s.sheet, r0, c0, r0 + rg.rows - 1, c0 + rg.cols - 1);
     }
     return { rg, match, sum };
   }
