@@ -1369,13 +1369,15 @@
 
   // SUM/AVERAGE: parameters are popped last to first; a range is summed on
   // its own (first cell first) and its total added as one term
+  const popOrder = (parts) => [].concat(...parts.map((p) => (Array.isArray(p) ? p : [p])));
   const sumParts = (parts) => kahan(parts.map((p) => (Array.isArray(p) ? sumArray(p) : p)));
   aggregate('SUM', (n, b, parts) => finite(sumParts(parts)));
-  aggregate('AVERAGE', (n, b, parts) => (n.length ? finite(sumParts(parts) / n.length) : E.DIV0));
+  // AVERAGE adds every value to one Kahan sum (no per-column sums)
+  aggregate('AVERAGE', (n, b, parts) => (n.length ? finite(kahan(popOrder(parts)) / n.length) : E.DIV0));
   const asFmt = (x, b) => (b && (x === 0 || x === 1) ? x === 1 : x);
   aggregate('MIN', (n, b) => (n.length ? asFmt(Math.min(...n), b) : 0), {}, 1);
   aggregate('MAX', (n, b) => (n.length ? asFmt(Math.max(...n), b) : 0), {}, 1);
-  aggregate('PRODUCT', (n) => (n.length ? finite(n.reduce((a, b) => a * b, 1)) : 0));
+  aggregate('PRODUCT', (n, b, parts) => (n.length ? finite(popOrder(parts).reduce((x, y) => x * y, 1)) : 0));
   aggregate('COUNT', (n) => n.length, { skipErrors: true, countText: true });
   aggregate('MEDIAN', (n) => {
     if (!n.length) return E.VALUE;
@@ -1384,7 +1386,6 @@
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }, { forward: true }, 1);
   // variance: values in Calc's order (parameters last to first, cells first to last)
-  const popOrder = (parts) => [].concat(...parts.map((p) => (Array.isArray(p) ? p : [p])));
   aggregate('STDEV', (n, b, parts) => (n.length < 2 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), false))));
 
   const variance = (n, pop) => {
@@ -2000,17 +2001,17 @@
     }
     const R = grids[0].length, C = grids[0][0].length;
     if (grids.some((g) => g.length !== R || g[0].length !== C)) return E.VALUE;
-    let sum = 0;
-    for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+    const prods = [];
+    for (let c = 0; c < C; c++) for (let r = 0; r < R; r++) {
       let p = 1;
       for (const g of grids) {
         const x = g[r][c];
         if (isErr(x)) return x;
         p *= typeof x === 'number' ? x : typeof x === 'boolean' ? +x : 0;
       }
-      sum += p;
+      prods.push(p);
     }
-    return sum;
+    return kahan(prods);
   });
   // COUNTIFS / SUMIFS / AVERAGEIFS: all criteria ranges must have the same shape
   function multiCond(self, nodes, ctx, first) {
