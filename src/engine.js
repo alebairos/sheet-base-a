@@ -1237,11 +1237,16 @@
     }
     rangeMatrix(v) {
       const sh = v.sheet;
-      const r2 = Math.min(v.r2, Math.max(v.r1, sh.maxR + 1)), c2 = Math.min(v.c2, Math.max(v.c1, sh.maxC + 1));
+      // (as large as the range: cells past the data are empty elements; only
+      // a huge range is cut a row and a column past the data)
+      const big = (v.r2 - v.r1 + 1) * (v.c2 - v.c1 + 1) > 1 << 18;
+      const r2 = big ? Math.min(v.r2, Math.max(v.r1, sh.maxR + 1)) : v.r2, c2 = big ? Math.min(v.c2, Math.max(v.c1, sh.maxC + 1)) : v.c2;
+      const rd = Math.min(r2, Math.max(sh.maxR, v.r1 - 1)), cd = Math.min(c2, Math.max(sh.maxC, v.c1 - 1));
       const rows = [];
       for (let r = v.r1; r <= r2; r++) {
         const row = [];
-        for (let c = v.c1; c <= c2; c++) { const x = this.cellValue(sh, r, c); row.push(x === EMPTYR ? null : x); }
+        if (r > rd) { for (let c = v.c1; c <= c2; c++) row.push(null); rows.push(row); continue; }
+        for (let c = v.c1; c <= c2; c++) { const x = c > cd ? null : this.cellValue(sh, r, c); row.push(x === EMPTYR ? null : x); }
         rows.push(row);
       }
       return new Matrix(rows);
