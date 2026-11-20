@@ -545,7 +545,8 @@
           const un = (q, b) => (q !== undefined ? q.replace(/''/g, "'") : b);
           sheet = un(m3[1], m3[2]); sheet2 = un(m3[3], m3[4]);
           const rest3 = src.slice(i + m3[0].length);
-          if (!/^\$?[A-Za-z]{1,3}\$?\d/.test(rest3)) { sheet = null; sheet2 = null; } else j = i + m3[0].length;
+          // (a second name that reads as a number with a point or an exponent is not one: Main:1.5!A1)
+          if (!/^\$?[A-Za-z]{1,3}\$?\d/.test(rest3) || (m3[3] === undefined && /^\d*\.?\d*(?:[eE][+-]?\d*)?$/.test(sheet2) && /[.eE]/.test(sheet2))) { sheet = null; sheet2 = null; } else j = i + m3[0].length;
         }
       }
       if (sheet2 !== null) { /* already parsed */ } else
@@ -560,8 +561,10 @@
         if (src[j] !== '!') throw new SyntaxError('expected !');
         sheet = s; j++;
       } else {
-        const m = /^([A-Za-z_\p{L}\p{M}][\w.\p{L}\p{N}\p{M}\u00B7]*)!/u.exec(src.slice(i));
-        if (m) { sheet = m[1]; j = i + m[0].length; }
+        // (a name starting with a digit is a sheet name too, unless it reads
+        // as a number: 1st!A1, 3D!A1; 2024!A1 is 2024 intersected with A1)
+        const m = /^([\w\p{L}\p{M}][\w.\p{L}\p{N}\p{M}\u00B7]*)!/u.exec(src.slice(i));
+        if (m && !/^\d+(?:$|\.|[eE](?:\d|$))/.test(m[1])) { sheet = m[1]; j = i + m[0].length; }
       }
       const rest = src.slice(j);
       if (sheet !== null || /^\$?[A-Za-z]/.test(rest) || /^\$?\d/.test(rest)) {
@@ -642,9 +645,11 @@
         if (/^[A-Za-z_\p{L}\p{N}\p{M}\u00B7]/u.test(after) && !/[eE][+-]/.test(m[0])) {
           const w = /^[\w.\p{L}\p{N}\p{M}\u00B7]*/u.exec(after)[0];
           const next = after.slice(w.length);
-          if (/^[eE]$/.test(w) && next !== '' && !/^[+-]/.test(next)) fail0('bad exponent', 'Err:509');
-          toks.push({ t: 'name', v: m[0] + w });
-          i += m[0].length + w.length;
+          if (/^[eE]$/.test(w) && next !== '' && !/^[+!-]/.test(next)) fail0('bad exponent', 'Err:509');
+          // (and so is what follows a '!' after it: 1e!A1)
+          const x = next[0] === '!' ? /^![\w.$:\p{L}\p{N}\p{M}\u00B7]*/u.exec(next)[0] : '';
+          toks.push({ t: 'name', v: m[0] + w + x });
+          i += m[0].length + w.length + x.length;
           continue;
         }
         // (an exponent running into a '.' when the mantissa had none, or into
