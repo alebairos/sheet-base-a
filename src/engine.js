@@ -464,7 +464,14 @@
         continue;
       }
       if (ch === '#') {
-        const lit = ERRLITS.find((e) => src.substr(i, e.length).toUpperCase() === e);
+        let lit = ERRLITS.find((e) => src.substr(i, e.length).toUpperCase() === e);
+        // (an error constant running into more name characters is a name: #N/A!)
+        if (lit === '#N/A' && /^[\d!]/.test(src.slice(i + lit.length))) {
+          const w = /^#[\w.!?/$]*/.exec(src.slice(i))[0];
+          toks.push({ t: 'name', v: w });
+          i += w.length;
+          continue;
+        }
         // #REF! (an invalid reference) and unknown #words read as unknown names
         if ((!lit && !/^#GETTING_DATA/i.test(src.slice(i))) || lit === '#REF!') {
           const w = /^#[\w.]*[!?]?\w*/.exec(src.slice(i))[0];
@@ -543,12 +550,21 @@
           if (sheet !== null) {
             // (a sheet name before something that is not a reference: an unknown name)
             const w = /^[\w.$\u00C0-\uFFFF]*/.exec(rest)[0];
+            if (!w && j > i) { toks.push({ t: 'name', v: src.slice(i, j) }); i = j; continue; }
             if (!w || /^[(]/.test(rest.slice(w.length)) && /^\$?[A-Za-z]{1,3}\$?\d+$/.test(w)) throw new SyntaxError('bad reference');
             toks.push({ t: 'name', v: src.slice(i, j) + w });
             i = j + w.length;
             continue;
           }
         }
+      }
+      // ('[' (an external or table reference) or '.' before a letter starts a name)
+      if (ch === ']' || (ch === '[' && src.indexOf(']', i) < 0)) fail0('unbalanced bracket', '#N/A');
+      if (ch === '[' || (ch === '.' && /^\.[A-Za-z_.]/.test(src.slice(i)))) {
+        const w = /^(?:\[[^\]]*\]?)?[\w.$!:\u00C0-\uFFFF]*/.exec(src.slice(i))[0];
+        toks.push({ t: 'name', v: w });
+        i += w.length;
+        continue;
       }
       if (/[0-9.]/.test(ch)) {
         const rm = rowRangeRe.exec(src.slice(i));
@@ -739,6 +755,7 @@
         }
         case 'op':
           if (t.v === '(') {
+            if (peek().t === 'eof') fail('unterminated (', 'Err:510');
             const e = comparison();
             if (isOp(',')) { // reference union (A1:A2,B1)
               const items = [e];
@@ -750,6 +767,7 @@
             return { t: 'paren', a: e };
           }
           if (t.v === '{') return arrayConst();
+          if (t.v === '%') { const e = new SyntaxError('unexpected %'); e.code = '#N/A'; throw e; }
           if (t.v === '-') return { t: 'neg', a: unary() };
           if (t.v === '+') return unary();
           if (t.v === '@') return { t: 'at', a: unary() };
