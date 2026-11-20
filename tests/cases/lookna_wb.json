@@ -1,0 +1,24 @@
+{
+ "lookup_na_ref": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "B1": "=NA()",
+    "B2": "=MATCH(B1,A1:A2,0)",
+    "B3": "=ISNA(B2)",
+    "B4": "=ISERR(B2)",
+    "B5": "=ISNA(MATCH(B1,A1:A2,1))",
+    "B6": "=ISNA(VLOOKUP(B1,A1:A2,1,0))",
+    "B7": "=COUNTIF(B1:B2,\"#N/A\")",
+    "B8": "=IFERROR(B2,\"e\")",
+    "B9": "=ISERROR(B2)",
+    "B10": "=B2",
+    "B11": "=ISNA(B10)",
+    "B12": "=ISNA(HLOOKUP(NA(),A1:A2,1,0))",
+    "B13": "=SUM(B2,1)",
+    "B14": "=ISNA(INDEX(A1:A2,MATCH(NA(),A1:A2,0)))"
+   }
+  }
+ }
+}

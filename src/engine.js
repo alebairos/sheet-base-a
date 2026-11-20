@@ -18,7 +18,11 @@
   for (const [k, code] of Object.entries({
     DIV0: '#DIV/0!', VALUE: '#VALUE!', REF: '#REF!', NAME: '#NAME?', NA: '#N/A', NUM: '#NUM!', NULL: '#NULL!',
   })) { E[k] = new FErr(code, false); EREF[code] = new FErr(code, true); }
+  // a lookup whose lookup value is #N/A gives an internal Calc error that
+  // files show as #N/A but that ISNA does not recognise
+  E.LOOKNA = new FErr('Err:LOOKNA', false); EREF['Err:LOOKNA'] = new FErr('Err:LOOKNA', true);
   const errByCode = (code) => Object.values(E).find((e) => e.code === code) || new FErr(code);
+  const errText = (code) => (code[0] === '#' ? code : '#N/A');
   const isErr = (v) => v instanceof FErr;
   const asRefErr = (v) => (isErr(v) && !v.fromRef ? (EREF[v.code] || new FErr(v.code, true)) : v);
   const asComputed = (v) => (isErr(v) && v.fromRef ? errByCode(v.code) : v);
@@ -1833,7 +1837,7 @@
     const v = this.sv(nodes[0], ctx);
     const tbl = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
-    if (isErr(v) && !v.fromRef) return v;
+    if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
     if (isErr(tbl)) return tbl;
     if (isErr(rest)) return rest;
     if (isErr(v)) return v;
@@ -1856,7 +1860,7 @@
     const v = this.sv(nodes[0], ctx);
     const tbl = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
-    if (isErr(v) && !v.fromRef) return v;
+    if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
     if (isErr(tbl)) return tbl;
     if (isErr(rest)) return rest;
     if (isErr(v)) return v;
@@ -1879,7 +1883,7 @@
     const v = this.sv(nodes[0], ctx);
     const rg = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n'], [1]);
-    if (isErr(v) && !v.fromRef) return v;
+    if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
     if (isErr(rg)) return rg;
     if (isErr(rest)) return rest;
     if (isErr(v)) return v;
@@ -1922,7 +1926,7 @@
   // ---------------------------------------------------------------- public API
   function outValue(v) {
     if (v === EMPTYR || v === null) return 0;
-    if (isErr(v)) return { error: v.code };
+    if (isErr(v)) return { error: errText(v.code) };
     if (typeof v === 'number') {
       if (!isFinite(v)) return { error: '#NUM!' };
       const r = Number(v.toPrecision(15));

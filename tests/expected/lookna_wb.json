@@ -1,0 +1,32 @@
+{
+ "lookup_na_ref": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "B1": {
+     "error": "#N/A"
+    },
+    "B2": {
+     "error": "#N/A"
+    },
+    "B3": true,
+    "B4": false,
+    "B5": true,
+    "B6": true,
+    "B7": 2,
+    "B8": "e",
+    "B9": true,
+    "B10": {
+     "error": "#N/A"
+    },
+    "B11": true,
+    "B12": false,
+    "B13": {
+     "error": "#N/A"
+    },
+    "B14": false
+   }
+  }
+ }
+}
