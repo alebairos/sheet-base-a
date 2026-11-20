@@ -2646,6 +2646,7 @@
     const a = this.args(nodes, ctx, ['s', 's', 'n'], [undefined, undefined, 1]); if (isErr(a)) return a;
     const st = Math.trunc(a[2]);
     if (st < 1 || st > a[1].length + 1) return E.IARG;
+    if (a[0] === '') return E.VALUE; // (Calc's search finds no empty text)
     const re = new RegExp(wildcardRe(a[0]).source.slice(1, -1), 'iu');
     const m = re.exec(a[1].slice(st - 1));
     return m ? cpCount(a[1].slice(0, m.index + st - 1)) + 1 : E.VALUE;
@@ -2802,6 +2803,8 @@
     if (v === EMPTYR) v = '';
     if (typeof v === 'boolean') v = v ? 1 : 0;
     if (typeof v === 'string') { const n = textToNum(v); if (n !== null && v !== '') v = n; }
+    // (a number given a text format, one with @, is written as in General)
+    if (typeof v === 'number' && /@/.test(a[1].replace(/"[^"]*"?|\\./g, ''))) return fmtNum(v);
     return textFormat(v, a[1]);
   });
   def('REPT', 2, 2, function (nodes, ctx) {
