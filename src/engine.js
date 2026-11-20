@@ -1750,6 +1750,18 @@
   def('ISERR', 1, 1, function (nodes, ctx) { const v = this.sv(nodes[0], ctx); return isErr(v) && v.code !== '#N/A'; });
   def('ISLOGICAL', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) === 'boolean'; });
   def('ISNONTEXT', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) !== 'string'; });
+  def('N', 1, 1, function (nodes, ctx) {
+    const v = this.sv(nodes[0], ctx);
+    if (isErr(v)) return v;
+    if (typeof v === 'number') return v;
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    return 0;
+  });
+  def('T', 1, 1, function (nodes, ctx) {
+    const v = this.sv(nodes[0], ctx);
+    if (isErr(v)) return v;
+    return typeof v === 'string' ? v : '';
+  });
   def('SIGN', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n']); if (isErr(a)) return a;
     return a[0] > 0 ? 1 : a[0] < 0 ? -1 : 0;
@@ -1917,7 +1929,7 @@
   const ELEMENTWISE = new Set(['IF', 'IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISNA', 'ISERR', 'ISLOGICAL',
     'ISNONTEXT', 'LEN', 'ABS', 'ROUND', 'ROUNDUP', 'ROUNDDOWN', 'INT', 'TRUNC', 'SIGN', 'NOT', 'UPPER', 'LOWER', 'LEFT',
     'RIGHT', 'MID', 'TRIM', 'VALUE', 'MOD', 'POWER', 'SQRT', 'EXACT', 'EXP', 'LN', 'SEARCH', 'FIND', 'SUBSTITUTE',
-    'PROPER', 'REPT', 'CODE', 'CHAR', 'ISODD', 'ISEVEN']);
+    'PROPER', 'REPT', 'CODE', 'CHAR', 'ISODD', 'ISEVEN', 'N', 'T']);
   def('SUMPRODUCT', 1, undefined, function (nodes, ctx) {
     const grids = [];
     for (const n of nodes) {
