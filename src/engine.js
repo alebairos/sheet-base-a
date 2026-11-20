@@ -1162,13 +1162,16 @@
     // whose inline arrays still compute element by element)
     // (a single cell reference is a scalar even in an array context, as
     // Calc's single reference: SUMPRODUCT(B4^2) with text in B4 is #VALUE!)
-    aev(node, ctx, sc) {
+    // (trim: a range taken as an array is trimmed as a scalar function's, see trimMatrix)
+    aev(node, ctx, sc, trim) {
       let u = node; while (u.t === 'paren') u = u.a; // ((B7) is the same single reference)
-      const v = this.aev1(node, ctx, sc);
+      let v = this.aev1(node, ctx, sc);
       // (a single reference a function passes on, IFERROR(A7,0), IF(1,A7), stays
       // one, as does the one cell INDEX or OFFSET gives)
       const single = v instanceof Range && u.t === 'fn' && (v.single || ((u.name === 'INDEX' || u.name === 'OFFSET') && v.rows === 1 && v.cols === 1));
-      return this.aevPost(v, ctx, sc || (u.t === 'ref' && !u.b) || single);
+      const scal = sc || (u.t === 'ref' && !u.b) || single;
+      if (trim && v instanceof Range && !scal) v = this.trimMatrix(v);
+      return this.aevPost(v, ctx, scal);
     }
     // an error function of the formula has run (counted once: see countErrFuncs)
     // an error met while the formula still has an error function to run:
@@ -1501,7 +1504,8 @@
             // a criterion / lookup value / index given as an array: one call per element
             const args = mp.map((i) => {
               if (i >= node.args.length || node.args[i].t === 'missing') return null;
-              const v = this.aev(node.args[i], ctx, sc);
+              // (a whole-column range here is trimmed to the data, as for a scalar function)
+              const v = this.aev(node.args[i], ctx, sc, true);
               return LOOKUPS.has(name) ? v : one(v);
             });
             if (!args.some((m) => m instanceof Matrix)) return mark(this.ev0(node, ctx));
