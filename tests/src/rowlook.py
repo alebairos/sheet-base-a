@@ -1,6 +1,6 @@
 # Approximate lookups along unsorted cell rows mixing numbers, text, booleans,
 # blanks and errors (MATCH 1/-1, HLOOKUP sorted), text and numeric queries.
-# Run: python3 tests/src/rowlook.py 1 300 > tests/cases/rowlook.json
+# Run: python3 tests/src/rowlook.py 1 400 > tests/cases/rowlook.json (rowlookb: seed 77)
 import json, random, sys
 random.seed(int(sys.argv[1]) if len(sys.argv) > 1 else 1)
 N = int(sys.argv[2]) if len(sys.argv) > 2 else 300

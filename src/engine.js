@@ -2222,19 +2222,24 @@
       }
       start = broken ? idx[0] : found !== null ? idx[found] : idx[last];
     }
-    let foundRow = -1, fsi = firstStringIgnore && !skipped, eq = false, ended = true;
-    // (along a row, an ascending text search passes over numbers, but a walk
-    // that runs to the end of the row on one is no match: MATCH("x",{-3,"b"}
-    // as cells) is 2, MATCH("x",{"b",-3} as cells) is #N/A)
+    let foundRow = -1, fsi = firstStringIgnore && !skipped, eq = false;
+    // (along a row, an ascending text search passes over numbers, but a
+    // number undoes the match found so far until the next one, and a first
+    // text passed over after numbers is no match: MATCH("x",A1:B1) is 2 with
+    // -3,"b" and #N/A with "b",-3; MATCH("x",A1:C1) with "a",1,"b" is 3)
     const passNums = !binary && byStr && asc;
+    let leadNums = false;
     for (let r = start; r < n; r++) {
       const c = list[r];
       if (c === null || (allStringIgnore && isStr(c))) continue;
-      if (passNums && typeof c === 'number') { if (r === n - 1) foundRow = -1; continue; }
+      if (passNums && typeof c === 'number') { if (foundRow < 0) leadNums = true; foundRow = -1; continue; }
       if (isStr(c) === byStr && c !== ERRC) {
         const t = cmp(c);
         if (asc ? t <= 0 : t >= 0) { foundRow = r; fsi = false; if (t === 0) { eq = true; break; } continue; }
       }
+      // (numbers before a first text passed over: no match)
+      if (fsi && isStr(c) && passNums && leadNums) { foundRow = -1; break; }
+      if (fsi && isStr(c)) { fsi = false; continue; }
       if (fsi && isStr(c)) { fsi = false; continue; }
       break;
     }
