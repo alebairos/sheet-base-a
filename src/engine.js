@@ -2258,10 +2258,20 @@
         const r1 = Math.min(node.a.r, b.r), r2 = Math.min(Math.max(node.a.r, b.r), s.maxR);
         const c1 = Math.min(node.a.c, b.c), c2 = Math.min(Math.max(node.a.c, b.c), s.maxC);
         if (r2 < r1 || c2 < c1) return;
-        if ((r2 - r1 + 1) * (c2 - c1 + 1) > s.cells.size) {
-          for (const x of s.cells.values()) if (x.r >= r1 && x.r <= r2 && x.c >= c1 && x.c <= c2) add(x);
-        } else {
-          for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) add(s.cells.get(r * MAXCOL + c));
+        // formula cells of the sheet by column, sorted by row
+        if (!s.fcols) {
+          s.fcols = new Map();
+          for (const x of s.cells.values()) if (x.formula) { if (!s.fcols.has(x.c)) s.fcols.set(x.c, []); s.fcols.get(x.c).push(x); }
+          for (const list of s.fcols.values()) list.sort((p, q) => p.r - q.r);
+        }
+        const cols = c2 - c1 + 1 > s.fcols.size ? [...s.fcols.keys()].filter((c) => c >= c1 && c <= c2).sort((p, q) => p - q)
+          : Array.from({ length: c2 - c1 + 1 }, (_, k) => c1 + k);
+        for (const c of cols) {
+          const list = s.fcols.get(c);
+          if (!list) continue;
+          let lo = 0, hi = list.length;
+          while (lo < hi) { const m = (lo + hi) >> 1; if (list[m].r < r1) lo = m + 1; else hi = m; }
+          for (let k = lo; k < list.length && list[k].r <= r2; k++) add(list[k]);
         }
         return;
       }
