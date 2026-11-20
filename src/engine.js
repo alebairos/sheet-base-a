@@ -1240,6 +1240,12 @@
           // (a range in its value outside any function: no quirk seen)
           if (n.args[0].t !== 'fn' && hasRange(n.args[0])) return false;
           const pend = this.pend, gerr = this.gerr;
+          // (a value that gives an array makes a nested jump matrix: no quirk)
+          if (hasArr(n.args[0])) {
+            const c = this.aev(n.args[0], ctx, true);
+            this.pend = pend; this.gerr = gerr;
+            if (c instanceof Matrix) return false;
+          }
           const v = this.sv(n.args[0], ctx);
           const f = isErr(v) && n.args.length > 1 && n.args[1].t !== 'missing' ? this.sv(n.args[1], ctx) : null;
           this.pend = pend; this.gerr = gerr;
