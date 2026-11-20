@@ -5,6 +5,8 @@
  */
 (function (root) {
   'use strict';
+  const eng = typeof module !== 'undefined' && module.exports ? require('./engine.js') : root.SheetEngine;
+  const fmtNum = eng && eng.fmtNum;
 
   function colName(c) {
     let s = '';
@@ -74,6 +76,8 @@
     if (v === null || v === undefined) return '';
     if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
     if (typeof v === 'object' && v.error) return v.error;
+    // numbers as LibreOffice writes them: 15 significant digits, 1E+021
+    if (typeof v === 'number') return fmtNum ? fmtNum(v) : String(v);
     return String(v);
   }
 
