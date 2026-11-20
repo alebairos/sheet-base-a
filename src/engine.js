@@ -499,8 +499,8 @@
       let sheet = null, sheet2 = null;
       let j = i;
       {
-        const nm = "(?:'((?:[^']|'')+)'|([A-Za-z_\u00C0-\uFFFF][\\w.\u00C0-\uFFFF]*))";
-        const m3 = new RegExp('^' + nm + ':' + nm + '!').exec(src.slice(i));
+        const nm = "(?:'((?:[^']|'')+)'|([A-Za-z_\\p{L}\\p{N}\\p{M}][\\w.\\p{L}\\p{N}\\p{M}\u00B7]*))";
+        const m3 = new RegExp('^' + nm + ':' + nm + '!', 'u').exec(src.slice(i));
         if (m3) {
           const un = (q, b) => (q !== undefined ? q.replace(/''/g, "'") : b);
           sheet = un(m3[1], m3[2]); sheet2 = un(m3[3], m3[4]);
@@ -520,13 +520,13 @@
         if (src[j] !== '!') throw new SyntaxError('expected !');
         sheet = s; j++;
       } else {
-        const m = /^([A-Za-z_\u00C0-\uFFFF][\w.\u00C0-\uFFFF]*)!/.exec(src.slice(i));
+        const m = /^([A-Za-z_\p{L}\p{N}\p{M}][\w.\p{L}\p{N}\p{M}\u00B7]*)!/u.exec(src.slice(i));
         if (m) { sheet = m[1]; j = i + m[0].length; }
       }
       const rest = src.slice(j);
       if (sheet !== null || /^\$?[A-Za-z]/.test(rest) || /^\$?\d/.test(rest)) {
         let m = refRe.exec(rest);
-        if (m && !/^[\w($]/.test(rest.slice(m[0].length)) && !/^[.]/.test(rest.slice(m[0].length))) {
+        if (m && !/^[\w($\p{L}\p{N}\p{M}\u00B7]/u.test(rest.slice(m[0].length)) && !/^[.]/.test(rest.slice(m[0].length))) {
           const a = parseAddr(m[1]);
           const b = m[2] ? parseAddr(m[2]) : null;
           if (a && (!m[2] || b)) {
@@ -560,7 +560,7 @@
           }
           if (sheet !== null) {
             // (a sheet name before something that is not a reference: an unknown name)
-            const w = /^[\w.$\u00C0-\uFFFF]*/.exec(rest)[0];
+            const w = /^[\w.$\p{L}\p{N}\p{M}\u00B7]*/u.exec(rest)[0];
             if (!w && j > i) { toks.push({ t: 'name', v: src.slice(i, j) }); i = j; continue; }
             if (!w || /^[(]/.test(rest.slice(w.length)) && /^\$?[A-Za-z]{1,3}\$?\d+$/.test(w)) throw new SyntaxError('bad reference');
             toks.push({ t: 'name', v: src.slice(i, j) + w });
@@ -572,7 +572,7 @@
       // ('[' (an external or table reference) or '.' before a letter starts a name)
       if (ch === ']' || (ch === '[' && src.indexOf(']', i) < 0)) fail0('unbalanced bracket', '#N/A');
       if (ch === '[' || (ch === '.' && /^\.[A-Za-z_.]/.test(src.slice(i)))) {
-        const w = /^(?:\[[^\]]*\]?)?[\w.$!:\u00C0-\uFFFF]*/.exec(src.slice(i))[0];
+        const w = /^(?:\[[^\]]*\]?)?[\w.$!:\p{L}\p{N}\p{M}\u00B7]*/u.exec(src.slice(i))[0];
         toks.push({ t: 'name', v: w });
         i += w.length;
         continue;
@@ -592,8 +592,8 @@
         // (2x, 1E5E5), unless a signed exponent ended it (1e+5x); an
         // unfinished exponent before anything but the end or a sign is a
         // syntax error (1e*2)
-        if (/^[A-Za-z_]/.test(after) && !/[eE][+-]/.test(m[0])) {
-          const w = /^[\w.]*/.exec(after)[0];
+        if (/^[A-Za-z_\p{L}\p{N}\p{M}\u00B7]/u.test(after) && !/[eE][+-]/.test(m[0])) {
+          const w = /^[\w.\p{L}\p{N}\p{M}\u00B7]*/u.exec(after)[0];
           const next = after.slice(w.length);
           if (/^[eE]$/.test(w) && next !== '' && !/^[+-]/.test(next)) fail0('bad exponent', 'Err:509');
           toks.push({ t: 'name', v: m[0] + w });
@@ -608,8 +608,9 @@
         continue;
       }
       // ('$' is a name character to Calc: a stray one makes an unknown name)
-      if (/[A-Za-z_$\u00C0-\uFFFF]/.test(ch)) {
-        const m = /^[A-Za-z_$\u00C0-\uFFFF][\w.$\u00C0-\uFFFF]*/.exec(src.slice(i));
+      // (non-ASCII spaces start a name too)
+      if (/^[A-Za-z_$\p{L}\p{N}\p{M}\p{Zs}]/u.test(src.slice(i))) {
+        const m = /^[A-Za-z_$\p{L}\p{N}\p{M}\p{Zs}][\w.$\p{L}\p{N}\p{M}\u00B7]*/u.exec(src.slice(i));
         toks.push({ t: 'name', v: m[0] });
         i += m[0].length;
         continue;
@@ -617,6 +618,15 @@
       const two = src.substr(i, 2);
       if (two === '<=' || two === '>=' || two === '<>') { toks.push({ t: 'op', v: two }); i += 2; continue; }
       if ('+-*/^&=<>%(),;{}:!@'.indexOf(ch) >= 0) { toks.push({ t: 'op', v: ch }); i++; continue; }
+      // (a symbol or punctuation outside ASCII fails the whole formula: #N/A;
+      // a stray ~ | \ ` ? where an operand belongs, at the end (or ? before a
+      // name), is an unknown name)
+      if (ch.charCodeAt(0) >= 0x80) fail0('unexpected character ' + ch, '#N/A');
+      const prevOp = !toks.length || (toks[toks.length - 1].t === 'op' && !/^[)%}]$/.test(toks[toks.length - 1].v));
+      if (prevOp && '~|\\`?'.indexOf(ch) >= 0) {
+        const w = ch === '?' ? /^\?[\w.$]*/.exec(src.slice(i))[0] : ch;
+        if (ch === '?' || !src.slice(i + 1).trim()) { toks.push({ t: 'name', v: w }); i += w.length; continue; }
+      }
       throw new SyntaxError('unexpected character ' + ch);
     }
     toks.push({ t: 'eof' });
