@@ -860,7 +860,16 @@
           return jmOf(this.amap([a], (x) => this.ev({ t: node.t, a: lit(x) }, ctx)), [a]);
         }
         case 'bin': {
-          const a = this.aev(node.a, ctx, sc), b = this.aev(node.b, ctx, sc);
+          let a, b;
+          const op0 = node.op;
+          if (sc && (op0 === '=' || op0 === '<>' || op0 === '<' || op0 === '>' || op0 === '<=' || op0 === '>=')) {
+            // a comparison with an array takes a range operand as an array
+            const note = (v) => { if (isErr(v) && !v.fromRef && !this.pend) this.pend = { err: v, clr: this.clr }; return v; };
+            const ra = note(this.aev1(node.a, ctx, sc)), rb = note(this.aev1(node.b, ctx, sc));
+            const anyMat = ra instanceof Matrix || rb instanceof Matrix;
+            const fix = (v) => (v instanceof Range ? (anyMat && (v.rows > 1 || v.cols > 1) ? this.rangeMatrix(v) : this.intersect(v, ctx)) : v);
+            a = fix(ra); b = fix(rb);
+          } else { a = this.aev(node.a, ctx, sc); b = this.aev(node.b, ctx, sc); }
           if (!(a instanceof Matrix) && !(b instanceof Matrix)) return asComputed(this.binop({ op: node.op, a: lit(a), b: lit(b) }, ctx));
           const op = node.op;
           if (op === '^' && !(a instanceof Matrix && b instanceof Matrix)) {
