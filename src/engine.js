@@ -1374,7 +1374,7 @@
   function condArgs(self, nodes, ctx) {
     const rg = self.ev(nodes[0], ctx);
     if (isErr(rg)) return rg;
-    if (!(rg instanceof Range)) return E.VALUE;
+    if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.VALUE;
     let crit = self.sv(nodes[1], ctx);
     if (crit === MISSING) crit = null;
     const match = makeCriterion(crit);
@@ -1383,6 +1383,11 @@
     if (nodes.length > 2 && nodes[2].t !== 'missing') {
       const s = self.ev(nodes[2], ctx);
       if (isErr(s)) return s;
+      if (rg instanceof Matrix) {
+        // an inline array: elements beyond the sum array are skipped
+        if (!(s instanceof Matrix)) return E.VALUE;
+        return { rg, match, sum: s };
+      }
       if (!(s instanceof Range)) return E.VALUE;
       sum = new Range(s.sheet, s.r1, s.c1, s.r1 + rg.rows - 1, s.c1 + rg.cols - 1);
     }
@@ -1391,6 +1396,16 @@
   function condCollect(self, a) {
     const nums = [];
     let err = null;
+    if (a.rg instanceof Matrix) {
+      a.rg.data.forEach((row, r) => row.forEach((v, c) => {
+        if (err || !a.match(v)) return;
+        const sv = a.sum.data[r] ? a.sum.data[r][c] : undefined;
+        if (typeof sv === 'number') nums.push(sv);
+        else if (typeof sv === 'boolean') nums.push(sv ? 1 : 0);
+        else if (isErr(sv)) err = sv;
+      }));
+      return err ? { err } : { nums };
+    }
     const blankMatches = a.match(null);
     const visit = (v, r, c) => {
       if (!a.match(v)) return true;
@@ -1419,6 +1434,10 @@
     const a = condArgs(this, nodes, ctx); if (isErr(a)) return a;
     let n = 0;
     const rg = a.rg;
+    if (rg instanceof Matrix) {
+      for (const row of rg.data) for (const v of row) if (a.match(v)) n++;
+      return n;
+    }
     if (a.match(null)) {
       // blanks match: count over the whole area, including cells beyond the used range
       const total = rg.rows * rg.cols;
