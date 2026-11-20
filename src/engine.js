@@ -2114,6 +2114,28 @@
     }
     return hit > 0 ? hit - 1 : -1;
   }
+  // Calc's sorted VLOOKUP/HLOOKUP over an array: a walk that keeps the last
+  // element not above the query and stops at the first one above it (for a
+  // text query one above at the start is passed over); numbers are below
+  // any text (errors too), but a hit that is not text is no match; a numeric
+  // query passes over text, and an error element it meets is the result
+  function arrLookup(list, v) {
+    if (typeof v === 'boolean') v = +v;
+    const byStr = typeof v === 'string';
+    let hit = -1;
+    for (let i = 0; i < list.length; i++) {
+      let x = list[i];
+      if (isErr(x) && !byStr) return x;
+      if (x === null || x === undefined || x === EMPTYR || isMV(x)) x = byStr ? '' : null;
+      let c;
+      if (byStr) c = typeof x === 'string' ? strCmp(x, v) : -1;
+      else if (typeof x === 'string' || x === null) continue;
+      else c = +x === v ? 0 : +x < v ? -1 : 1;
+      if (c <= 0) hit = i; else if (i > 0 || !byStr) break;
+    }
+    if (byStr && hit >= 0 && typeof list[hit] !== 'string') return -1;
+    return hit;
+  }
   function lookupPos(list, v, mode, ranges, numsBelowText) {
     if (typeof v === 'boolean') v = v ? 1 : 0;
     // an ascending wildcard search over cells: the first cell the pattern
@@ -3149,7 +3171,9 @@
     if (row < 1 || row > tbl.rows) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
     if (v === null) v = ''; else if (isLB(v) || v === EMPTYR || isMV(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
-    const i = lookupPos(this.firstLine(tbl, true), v, sorted ? 1 : 0, tbl instanceof Range ? 'row' : null);
+    const list = this.firstLine(tbl, true);
+    const i = sorted && tbl instanceof Matrix ? arrLookup(list, v) : lookupPos(list, v, sorted ? 1 : 0, tbl instanceof Range ? 'row' : null);
+    if (isErr(i)) return i;
     if (i < 0) return E.NA;
     let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + row - 1, tbl.c1 + i) : tbl.data[row - 1][i];
     if (out === EMPTYR) return LEMPTY;
@@ -3175,7 +3199,8 @@
     if (isErr(v)) return v; // an error read from a cell, after the index check
     if (v === null) v = ''; else if (isLB(v) || v === EMPTYR || isMV(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const first = this.firstLine(tbl, false);
-    const i = lookupPos(first, v, sorted ? 1 : 0, tbl instanceof Range ? 'col' : null);
+    const i = sorted && tbl instanceof Matrix ? arrLookup(first, v) : lookupPos(first, v, sorted ? 1 : 0, tbl instanceof Range ? 'col' : null);
+    if (isErr(i)) return i;
     if (i < 0) return E.NA;
     let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + i, tbl.c1 + col - 1) : tbl.data[i][col - 1];
     if (out === EMPTYR) return LEMPTY;
