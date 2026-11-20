@@ -2506,7 +2506,9 @@
     // significant digits (tdf#124286: ROUNDUP(363136512.1386,3) is .138)
     if (nodes.length > 1 && x > 0 && Math.trunc(a[1]) < 12 && x % 1 !== 0) {
       const t = Math.floor(approxValue(Math.log10(x))) + 1 - 12;
-      x = Math.floor(approxValue(Math.pow(10, -t) * x)) * Math.pow(10, t);
+      // (scaled in two steps so that tiny values do not overflow the factor)
+      const t1 = Math.trunc(-t / 2), t2 = -t - t1;
+      x = Math.floor(approxValue(x * Math.pow(10, t1) * Math.pow(10, t2))) / Math.pow(10, t1) / Math.pow(10, t2);
     }
     return roundTo(x, a[1], 1);
   });
