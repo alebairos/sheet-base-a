@@ -881,6 +881,8 @@
             }), [a, b]);
           }
           const cmpOp = op === '=' || op === '<>' || op === '<' || op === '>' || op === '<=' || op === '>=';
+          // comparing an array with an error gives that error, not an array
+          if (cmpOp) { const e = [a, b].find((v) => !(v instanceof Matrix) && isErr(v)); if (e) return e; }
           return jmOf(this.amap([a, b], (x, y) => asComputed(this.binop({ op, a: lit(x), b: lit(y) }, ctx)), cmpOp), [a, b]);
         }
         case 'fn': {
@@ -894,18 +896,25 @@
             // a branch no element takes leaves no pending error behind
             const used = (k) => first.data.some((row) => row.some((x) => {
               if (name === 'IFERROR') return k === 1 && isErr(x);
-              if (isErr(x)) return false;
+              if (isErr(x) || typeof x === 'string') return false;
               const b = this.toBool(x);
               return !isErr(b) && (k === 1 ? b : !b);
             }));
             const args = [first];
             for (let k = 1; k < node.args.length; k++) {
               const before = this.pend;
-              args.push(node.args[k].t === 'missing' ? MISSING : this.aev(node.args[k], ctx, sc));
-              if (name === 'IF' ? !used(k) : k === 1 && !used(1)) this.pend = before;
+              // with an array condition a range branch is taken as an array
+              let b = node.args[k].t === 'missing' ? MISSING : this.aev1(node.args[k], ctx, sc);
+              if (b instanceof Range) b = this.rangeMatrix(b);
+              if (isErr(b) && !b.fromRef && !this.pend) this.pend = { err: b, clr: this.clr };
+              // a branch no element takes neither leaves a pending error nor sizes the result
+              if (name === 'IF' ? !used(k) : k === 1 && !used(1)) { this.pend = before; b = null; }
+              args.push(b);
             }
             const noElse = name === 'IF' && node.args.length < 3;
             return mark(this.amap(args, (...xs) => {
+              // a text element of an array condition is an error (even numeric text)
+              if (name === 'IF' && typeof xs[0] === 'string') return E.VALUE;
               const r = asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx));
               return noElse && r === false && !this.toBool(xs[0]) ? null : r;
             }));
@@ -927,11 +936,22 @@
             }));
           }
           if (!ELEMENTWISE.has(name)) return mark(this.ev0(node, ctx));
-          const args = node.args.map((n) => (n.t === 'missing' ? MISSING : one(this.aev(n, ctx, sc))));
+          // when another argument is an array, a range argument is taken as
+          // an array too (not intersected), except for POWER (Calc's ^)
+          const raws = node.args.map((n) => (n.t === 'missing' ? MISSING : this.aev1(n, ctx, sc)));
+          // (NOT takes a function-made array whole: Calc's NOT handles arrays itself)
+          const one1 = (v) => (name === 'NOT' ? v : one(v));
+          const anyMat = raws.some((v) => one1(v) instanceof Matrix);
+          const args = raws.map((v) => {
+            if (v instanceof Range) v = !sc || (anyMat && name !== 'POWER') ? this.rangeMatrix(v) : this.intersect(v, ctx);
+            else v = one1(v);
+            if (isErr(v) && !v.fromRef && !this.pend) this.pend = { err: v, clr: this.clr };
+            return v;
+          });
           if (!args.some((m) => m instanceof Matrix)) return mark(this.ev0(node, ctx));
           if (name === 'NOT' && args.length === 1) {
-            // Calc's matrix NOT: text that is not a number gives 0
-            return mark(this.amap(args, (x) => (typeof x === 'string' && textToNum(x) === null ? 0 : asComputed(this.call({ t: 'fn', name, args: [lit(x)] }, ctx)))));
+            // Calc's matrix NOT: an error or text that is not a number gives 0
+            return mark(this.amap(args, (x) => (isErr(x) || (typeof x === 'string' && textToNum(x) === null) ? 0 : asComputed(this.call({ t: 'fn', name, args: [lit(x)] }, ctx)))));
           }
           return mark(this.amap(args, (...xs) => asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx))));
         }
