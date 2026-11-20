@@ -1192,7 +1192,16 @@
             // element by element (IF without an else branch leaves the element empty;
             // CHOOSE's array index is a jump matrix like IF's condition)
             const pend0 = this.pend;
-            const first = node.args[0].t === 'missing' ? MISSING : this.aev(node.args[0], ctx, sc);
+            let first;
+            if (name === 'IFERROR' && !sc && node.args[0].t !== 'missing') {
+              // (in an array context IFERROR gives a reference without errors back as it is)
+              const raw = this.aev1(node.args[0], ctx, sc);
+              if (raw instanceof Range) {
+                const m = this.rangeMatrix(raw);
+                if (!m.data.some((row) => row.some(isErr))) { this.clr++; return raw; } // (IFERROR ran: no pending error)
+                first = this.aevPost(m, ctx, sc);
+              } else first = this.aevPost(raw, ctx, sc);
+            } else first = node.args[0].t === 'missing' ? MISSING : this.aev(node.args[0], ctx, sc);
             if (!(first instanceof Matrix)) { this.pend = pend0; return mark(this.ev0(node, ctx)); }
             // a branch no element takes leaves no pending error behind
             const used = (k) => first.data.some((row) => row.some((x) => {
@@ -1348,7 +1357,8 @@
       // (force array: functions inside take array arguments too,
       // MATCH(1,INDEX((A1:A3=2)*(B1:B3=20),0),0))
       this.fa = (this.fa || 0) + 1;
-      try { return this.aev(n, ctx); } finally { this.fa--; }
+      // (a function that gives a reference keeps it: INDEX(B1:B9,0))
+      try { const v = this.aev1(n, ctx); return v instanceof Range ? v : this.aevPost(v, ctx); } finally { this.fa--; }
     }
     // element-wise map; a single row/column is repeated, otherwise the
     // result is as large as the smallest operand
@@ -2112,7 +2122,11 @@
       const c = cmp(hit);
       if ((asc && c <= 0) || (!asc && c >= 0)) return hit;
     }
-    return hit > 0 ? hit - 1 : -1;
+    if (hit <= 0) return -1;
+    // (a hit before the last element must be of the query's type: text for a
+    // text query, not text for a number)
+    const x = list[hit - 1];
+    return (typeof x === 'string') === byStr ? hit - 1 : -1;
   }
   // Calc's sorted VLOOKUP/HLOOKUP over an array: a walk that keeps the last
   // element not above the query and stops at the first one above it (for a
@@ -2122,7 +2136,7 @@
   function arrLookup(list, v) {
     if (typeof v === 'boolean') v = +v;
     const byStr = typeof v === 'string';
-    let hit = -1;
+    let hit = -1, hitStr = false;
     for (let i = 0; i < list.length; i++) {
       let x = list[i];
       if (isErr(x) && !byStr) return x;
@@ -2131,9 +2145,9 @@
       if (byStr) c = typeof x === 'string' ? strCmp(x, v) : -1;
       else if (typeof x === 'string' || x === null) continue;
       else c = +x === v ? 0 : +x < v ? -1 : 1;
-      if (c <= 0) hit = i; else if (i > 0 || !byStr) break;
+      if (c <= 0) { hit = i; hitStr = typeof x === 'string'; } else if (i > 0 || !byStr) break;
     }
-    if (byStr && hit >= 0 && typeof list[hit] !== 'string') return -1;
+    if (byStr && hit >= 0 && !hitStr) return -1;
     return hit;
   }
   function lookupPos(list, v, mode, ranges, numsBelowText) {
@@ -3178,7 +3192,7 @@
     let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + row - 1, tbl.c1 + i) : tbl.data[row - 1][i];
     if (out === EMPTYR) return LEMPTY;
     if (typeof out === 'boolean') return out ? 1 : 0;
-    return out === null ? LBLANK : out;
+    return out === null ? (tbl instanceof Matrix ? '' : LBLANK) : out; // (an empty array element: empty text)
   });
 
   // ---- lookup
@@ -3205,7 +3219,7 @@
     let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + i, tbl.c1 + col - 1) : tbl.data[i][col - 1];
     if (out === EMPTYR) return LEMPTY;
     if (typeof out === 'boolean') return out ? 1 : 0;
-    return out === null ? LBLANK : out;
+    return out === null ? (tbl instanceof Matrix ? '' : LBLANK) : out; // (an empty array element: empty text)
   });
   def('MATCH', 2, 3, function (nodes, ctx) {
     let v = this.sv(nodes[0], ctx);
