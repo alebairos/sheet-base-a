@@ -25,7 +25,7 @@
   // but text criteria (COUNTIF(A1,"Err:502")) see their own text
   for (const [k, code] of Object.entries({
     IARG: 'Err:502', PARAM: 'Err:504', PAREN: 'Err:508', NOOP: 'Err:509', NOVAR: 'Err:510', NOARG: 'Err:511',
-    CIRC: 'Err:522', STROVF: 'Err:513', OVF: 'Err:514', CODEOVF: 'Err:512',
+    CIRC: 'Err:522', STROVF: 'Err:513', OVF: 'Err:514', CODEOVF: 'Err:512', MSIZE: 'Err:538',
   })) { E[k] = new FErr(code, false); EREF[code] = new FErr(code, true); }
   // a lookup given a computed error as its lookup value gives an internal
   // error: shown with that error's code (#N/A as Err:LOOKNA), but read as
@@ -39,7 +39,7 @@
   };
   const errByCode = (code) => Object.values(E).find((e) => e.code === code) || new FErr(code);
   // (files show the lookup error and Err:513, string overflow, as #N/A)
-  const errText = (code) => (code[0] === '#' ? code : code === 'Err:LOOKNA' || code === 'Err:MISS' || code === 'Err:512' || code === 'Err:513' || code === 'Err:514' ? '#N/A' : '#VALUE!');
+  const errText = (code) => (code[0] === '#' ? code : code === 'Err:LOOKNA' || code === 'Err:MISS' || code === 'Err:512' || code === 'Err:513' || code === 'Err:514' || code === 'Err:538' ? '#N/A' : '#VALUE!');
   const isErr = (v) => v instanceof FErr;
   const asRefErr = (v) => (isErr(v) && !v.fromRef ? (EREF[v.code] || new FErr(v.code, true)) : v);
   // an error whose pending state was cleared (IFERROR, ISNUMBER, ... ran
@@ -1248,12 +1248,17 @@
     }
     // a range a scalar function takes as an array: one that runs to the
     // sheet's last row or column ends at the last row and column with data,
-    // as Calc trims whole-column references there (none left: #N/A)
-    trimMatrix(v) {
+    // as Calc trims whole-column references there (none left: Calc's matrix
+    // size error Err:538, shown #N/A; ISBLANK, which Calc lets pop the
+    // reference itself, then takes the range's cell at the formula's position)
+    trimMatrix(v, ctx, name) {
       if (v.r2 < MAXROW - 1 && v.c2 < MAXCOL - 1) return this.rangeMatrix(v);
       const sh = v.sheet;
       const r2 = Math.min(v.r2, sh.maxR), c2 = Math.min(v.c2, sh.maxC);
-      if (r2 < v.r1 || c2 < v.c1) return new Matrix([[E.NA]]);
+      if (r2 < v.r1 || c2 < v.c1) {
+        if (name === 'ISBLANK') return this.intersect(v, ctx);
+        return new Matrix([[E.MSIZE]]);
+      }
       return this.rangeMatrix(new Range(sh, v.r1, v.c1, r2, c2));
     }
     rangeMatrix(v) {
@@ -1569,7 +1574,7 @@
           };
           const anyMat = raws.some((v) => one1(v) instanceof Matrix);
           const args = raws.map((v) => {
-            if (v instanceof Range) v = (!sc || (anyMat && name !== 'POWER')) && (v.rows > 1 || v.cols > 1) ? (name === 'NOT' ? this.rangeMatrix(v) : this.trimMatrix(v)) : this.intersect(v, ctx);
+            if (v instanceof Range) v = (!sc || (anyMat && name !== 'POWER')) && (v.rows > 1 || v.cols > 1) ? (name === 'NOT' ? this.rangeMatrix(v) : this.trimMatrix(v, ctx, name)) : this.intersect(v, ctx);
             else v = one1(v);
             return this.notePend(v);
           });
