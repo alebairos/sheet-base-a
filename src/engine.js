@@ -731,6 +731,29 @@
       }
     }
 
+    // the first column (or row) of a range as grid() gives it; cached for
+    // lookups once every cell in it is final (none is being computed)
+    firstLine(v, byRow) {
+      if (!(v instanceof Range)) { const g = this.grid(v); return byRow ? g[0] : g.map((row) => row[0]); }
+      const r2 = Math.min(v.r2, Math.max(v.sheet.maxR, v.r1)), c2 = Math.min(v.c2, Math.max(v.sheet.maxC, v.c1));
+      const key = v.sheet.name + '|' + v.r1 + '|' + v.c1 + '|' + (byRow ? 'r' + c2 : 'c' + r2);
+      if (!this.lineCache) this.lineCache = new Map();
+      const hit = this.lineCache.get(key);
+      if (hit) return hit;
+      const out = [];
+      let final = true;
+      const get = (r, c) => {
+        const cell = v.sheet.cells.get(r * MAXCOL + c);
+        if (cell && cell.state === 1) final = false;
+        const x = this.cellValue(v.sheet, r, c);
+        return x === EMPTYR ? 0 : x;
+      };
+      if (byRow) for (let c = v.c1; c <= c2; c++) out.push(get(v.r1, c));
+      else for (let r = v.r1; r <= r2; r++) out.push(get(r, v.c1));
+      if (final) this.lineCache.set(key, out);
+      return out;
+    }
+
     // cells of a range/matrix as a 2D array (clamped to used area for ranges)
     grid(v) {
       if (v instanceof Matrix) return v.data;
@@ -2278,10 +2301,9 @@
     if (row < 1 || row > tbl.rows) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
     if (v === null) return E.NA;
-    const g = this.grid(tbl);
-    const i = lookupPos(g[0], v, sorted ? 1 : 0, tbl instanceof Range ? 'row' : null);
+    const i = lookupPos(this.firstLine(tbl, true), v, sorted ? 1 : 0, tbl instanceof Range ? 'row' : null);
     if (i < 0) return E.NA;
-    let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + row - 1, tbl.c1 + i) : g[row - 1][i];
+    let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + row - 1, tbl.c1 + i) : tbl.data[row - 1][i];
     if (out === EMPTYR) out = 0;
     if (typeof out === 'boolean') return out ? 1 : 0;
     return out === null ? 0 : out;
@@ -2301,11 +2323,10 @@
     if (col < 1 || col > tbl.cols) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
     if (v === null) return E.NA;
-    const g = this.grid(tbl);
-    const first = g.map((row) => row[0]);
+    const first = this.firstLine(tbl, false);
     const i = lookupPos(first, v, sorted ? 1 : 0, tbl instanceof Range ? 'col' : null);
     if (i < 0) return E.NA;
-    let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + i, tbl.c1 + col - 1) : g[i][col - 1];
+    let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + i, tbl.c1 + col - 1) : tbl.data[i][col - 1];
     if (out === EMPTYR) out = 0;
     if (typeof out === 'boolean') return out ? 1 : 0;
     return out === null ? 0 : out;
@@ -2323,8 +2344,7 @@
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.NA;
     if (rg.rows !== 1 && rg.cols !== 1) return E.PARAM;
     if (v === null) return E.NA;
-    const g = this.grid(rg);
-    const list = rg.cols === 1 ? g.map((row) => row[0]) : g[0];
+    const list = this.firstLine(rg, rg.cols !== 1);
     const mode = rest[0] > 0 ? 1 : rest[0] < 0 ? -1 : 0;
     const i = lookupPos(list, v, mode, rg instanceof Range ? (rg.cols === 1 ? 'col' : 'row') : null);
     return i < 0 ? E.NA : i + 1;
@@ -2403,7 +2423,11 @@
       for (const cell of sh.cells.values()) if (cell.formula) { cell.sheet = sh; cell.si = si; formulas.push(cell); }
     });
     const deps = new Map();
-    for (const cell of formulas) deps.set(cell, staticPrecedents(eng, cell));
+    // a multi-cell range is one node of the graph (shared by every formula
+    // using it), linked to the formula cells inside it
+    const rnodes = new Map();
+    for (const cell of formulas) deps.set(cell, staticPrecedents(eng, cell, rnodes));
+    for (const rn of rnodes.values()) deps.set(rn, rn.deps);
 
     // Tarjan's strongly connected components, iterative.
     let index = 0;
@@ -2447,18 +2471,39 @@
         for (const u of users.get(c) || []) if (!tainted.has(u)) { tainted.add(u); queue.push(u); }
       }
     }
-    for (const cell of order) if (!tainted.has(cell)) eng.cellValue(cell.sheet, cell.r, cell.c);
+    for (const cell of order) if (!cell.isRange && !tainted.has(cell)) eng.cellValue(cell.sheet, cell.r, cell.c);
     if (tainted.size) {
-      const rest = [...tainted].sort((a, b) => a.si - b.si || a.c - b.c || a.r - b.r);
+      const rest = [...tainted].filter((c) => !c.isRange).sort((a, b) => a.si - b.si || a.c - b.c || a.r - b.r);
       for (const cell of rest) eng.cellValue(cell.sheet, cell.r, cell.c);
     }
   }
 
+  // formula cells of a sheet inside a rectangle
+  function formulaCellsIn(s, r1, c1, r2, c2) {
+    // formula cells of the sheet by column, sorted by row
+    if (!s.fcols) {
+      s.fcols = new Map();
+      for (const x of s.cells.values()) if (x.formula) { if (!s.fcols.has(x.c)) s.fcols.set(x.c, []); s.fcols.get(x.c).push(x); }
+      for (const list of s.fcols.values()) list.sort((p, q) => p.r - q.r);
+    }
+    const out = [];
+    const cols = c2 - c1 + 1 > s.fcols.size ? [...s.fcols.keys()].filter((c) => c >= c1 && c <= c2).sort((p, q) => p - q)
+      : Array.from({ length: c2 - c1 + 1 }, (_, k) => c1 + k);
+    for (const c of cols) {
+      const list = s.fcols.get(c);
+      if (!list) continue;
+      let lo = 0, hi = list.length;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (list[m].r < r1) lo = m + 1; else hi = m; }
+      for (let k = lo; k < list.length && list[k].r <= r2; k++) out.push(list[k]);
+    }
+    return out;
+  }
+
   // Formula cells a formula may read, from its references (an over-approximation).
-  function staticPrecedents(eng, cell) {
+  function staticPrecedents(eng, cell, rnodes) {
     const out = [];
     const seen = new Set();
-    const add = (x) => { if (x && x.formula && !seen.has(x)) { seen.add(x); out.push(x); } };
+    const add = (x) => { if (x && (x.formula || x.isRange) && !seen.has(x)) { seen.add(x); out.push(x); } };
     const walk = (node) => {
       if (!node || typeof node !== 'object') return;
       if (node.t === 'ref3d') {
@@ -2480,21 +2525,12 @@
         const r1 = Math.min(node.a.r, b.r), r2 = Math.min(Math.max(node.a.r, b.r), s.maxR);
         const c1 = Math.min(node.a.c, b.c), c2 = Math.min(Math.max(node.a.c, b.c), s.maxC);
         if (r2 < r1 || c2 < c1) return;
-        // formula cells of the sheet by column, sorted by row
-        if (!s.fcols) {
-          s.fcols = new Map();
-          for (const x of s.cells.values()) if (x.formula) { if (!s.fcols.has(x.c)) s.fcols.set(x.c, []); s.fcols.get(x.c).push(x); }
-          for (const list of s.fcols.values()) list.sort((p, q) => p.r - q.r);
-        }
-        const cols = c2 - c1 + 1 > s.fcols.size ? [...s.fcols.keys()].filter((c) => c >= c1 && c <= c2).sort((p, q) => p - q)
-          : Array.from({ length: c2 - c1 + 1 }, (_, k) => c1 + k);
-        for (const c of cols) {
-          const list = s.fcols.get(c);
-          if (!list) continue;
-          let lo = 0, hi = list.length;
-          while (lo < hi) { const m = (lo + hi) >> 1; if (list[m].r < r1) lo = m + 1; else hi = m; }
-          for (let k = lo; k < list.length && list[k].r <= r2; k++) add(list[k]);
-        }
+        if ((r2 > r1 || c2 > c1) && rnodes) {
+          const key = eng.wb.sheets.indexOf(s) + ':' + r1 + ':' + c1 + ':' + r2 + ':' + c2;
+          let rn = rnodes.get(key);
+          if (!rn) { rn = { isRange: true, deps: formulaCellsIn(s, r1, c1, r2, c2) }; rnodes.set(key, rn); }
+          add(rn);
+        } else formulaCellsIn(s, r1, c1, r2, c2).forEach(add);
         return;
       }
       if (node.a && node.a.t) walk(node.a);
