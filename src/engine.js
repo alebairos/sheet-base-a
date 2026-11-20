@@ -1528,6 +1528,111 @@
     const a = this.args(nodes, ctx, ['n', 'n'], [undefined, 0]); if (isErr(a)) return a;
     return roundTo(a[0], a[1], -1);
   });
+  // TEXT(value, format): number formats without dates (sections, 0 # ?,
+  // thousands separators and scaling, %, exponents, quoted literals, @).
+  function splitSections(fmt) {
+    const out = []; let cur = '';
+    for (let i = 0; i < fmt.length; i++) {
+      const ch = fmt[i];
+      if (ch === '"') { const j = fmt.indexOf('"', i + 1); const e = j < 0 ? fmt.length : j; cur += fmt.slice(i, e + 1); i = e; continue; }
+      if (ch === '\\') { cur += fmt.slice(i, i + 2); i++; continue; }
+      if (ch === ';') { out.push(cur); cur = ''; continue; }
+      cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
+  function formatSection(x, sec) {
+    // tokens: literals and the number pattern
+    const toks = [];
+    let i = 0;
+    while (i < sec.length) {
+      const ch = sec[i];
+      if (ch === '"') { const j = sec.indexOf('"', i + 1); const e = j < 0 ? sec.length : j; toks.push({ lit: sec.slice(i + 1, e) }); i = e + 1; continue; }
+      if (ch === '\\') { toks.push({ lit: sec[i + 1] || '' }); i += 2; continue; }
+      if (ch === '[') { const j = sec.indexOf(']', i); i = j < 0 ? sec.length : j + 1; continue; }
+      if (ch === '_') { toks.push({ lit: ' ' }); i += 2; continue; }
+      if (ch === '*') { i += 2; continue; }
+      if ('0#?.,'.indexOf(ch) >= 0) { toks.push({ p: ch }); i++; continue; }
+      if ((ch === 'E' || ch === 'e') && (sec[i + 1] === '+' || sec[i + 1] === '-')) { toks.push({ e: sec[i + 1] }); i += 2; continue; }
+      if (ch === '%') { toks.push({ pct: true }); i++; continue; }
+      toks.push({ lit: ch }); i++;
+    }
+    const pat = toks.filter((t) => t.p);
+    if (toks.some((t) => t.pct)) x *= 100 ** toks.filter((t) => t.pct).length;
+    if (!pat.length) return toks.map((t) => t.lit !== undefined ? t.lit : t.pct ? '%' : '').join('');
+    // integer/decimal/exponent placeholder counts
+    const ei = toks.findIndex((t) => t.e);
+    let intP = '', decP = '', expP = '', seenDot = false, comma = false, trailingCommas = 0;
+    toks.forEach((t, k) => {
+      if (!t.p) return;
+      if (ei >= 0 && k > ei) { if (t.p !== ',' && t.p !== '.') expP += t.p; return; }
+      if (t.p === '.') { seenDot = true; return; }
+      if (t.p === ',') {
+        // a comma after the last digit placeholder scales by 1000
+        const rest = toks.slice(k + 1, ei >= 0 ? ei : toks.length).some((u) => u.p && u.p !== ',' && u.p !== '.');
+        if (!rest) trailingCommas++; else if (!seenDot) comma = true;
+        return;
+      }
+      if (seenDot) decP += t.p; else intP += t.p;
+    });
+    x /= 1000 ** trailingCommas;
+    let mant = Math.abs(x), exp = 0;
+    if (ei >= 0 && mant !== 0) {
+      const ip = Math.max(1, intP.length);
+      exp = Math.floor(Math.log10(mant)) - (ip - 1);
+      mant = mant / 10 ** exp;
+      if (Number(mant.toFixed(decP.length)) >= 10 ** ip) { mant /= 10; exp++; }
+    }
+    const scaled = Math.round(approxValue(mant * 10 ** decP.length));
+    let str = decP.length ? (scaled / 10 ** decP.length).toFixed(decP.length) : String(scaled);
+    if (!isFinite(scaled) || scaled > 1e21) str = mant.toFixed(decP.length);
+    let [ip, dp = ''] = str.split('.');
+    // decimals: trailing optional digits
+    let dd = dp.split('');
+    for (let k = decP.length - 1; k >= 0 && dd[k] === '0' && decP[k] !== '0'; k--) dd[k] = decP[k] === '?' ? ' ' : '';
+    dp = dd.join('');
+    // integer part
+    const minInt = (intP.match(/0/g) || []).length;
+    if (ip === '0' && minInt === 0) ip = '';
+    while (ip.length < minInt) ip = '0' + ip;
+    if (comma) ip = ip.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    let body = ip + (seenDot && (dp !== '' || /0|\?/.test(decP) || decP === '') && !(dp === '' && decP !== '') ? '.' + dp : '');
+    if (ei >= 0) {
+      const es = String(Math.abs(exp)).padStart((expP.match(/0/g) || []).length, '0');
+      body += 'E' + (exp < 0 ? '-' : toks[ei].e === '+' ? '+' : '') + es;
+    }
+    // place literals around the number (before first / after last placeholder)
+    const first = toks.findIndex((t) => t.p), last = toks.length - 1 - [...toks].reverse().findIndex((t) => t.p || t.e);
+    const pre = toks.slice(0, first).map((t) => t.lit !== undefined ? t.lit : t.pct ? '%' : '').join('');
+    const mid = toks.slice(first, last + 1).filter((t) => t.lit !== undefined || t.pct).map((t) => t.lit !== undefined ? t.lit : '%').join('');
+    const post = toks.slice(last + 1).map((t) => t.lit !== undefined ? t.lit : t.pct ? '%' : '').join('');
+    return pre + body + mid + post;
+  }
+  function textFormat(v, fmt) {
+    const secs = splitSections(fmt);
+    if (typeof v === 'string') {
+      const ts = secs.length >= 4 ? secs[3] : secs.find((x) => x.indexOf('@') >= 0);
+      return ts === undefined ? v : ts.replace(/"([^"]*)"/g, '$1').replace(/@/g, v);
+    }
+    if (fmt === '') return '';
+    if (/^general$/i.test(fmt.trim())) return fmtNum(v);
+    let sec = secs[0], x = v;
+    if (v < 0 && secs.length >= 2 && secs[1] !== '') { sec = secs[1]; x = -v; }
+    else if (v === 0 && secs.length >= 3) sec = secs[2];
+    if (/general/i.test(sec)) return sec.replace(/general/i, fmtNum(x)).replace(/"/g, '');
+    const out = formatSection(x, sec);
+    return (x < 0 && /[0#?]/.test(sec) && out.replace(/[^1-9]/g, '') !== '' ? '-' : '') + out;
+  }
+  def('TEXT', 2, 2, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['v', 's']); if (isErr(a)) return a;
+    let v = a[0];
+    if (v === null) v = 0;
+    if (v === EMPTYR) v = '';
+    if (typeof v === 'boolean') v = v ? 1 : 0;
+    if (typeof v === 'string') { const n = textToNum(v); if (n !== null && v !== '') v = n; }
+    return textFormat(v, a[1]);
+  });
   def('REPT', 2, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n']); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
