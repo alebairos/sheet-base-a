@@ -876,7 +876,7 @@
           if (op === '^' && !(a instanceof Matrix && b instanceof Matrix)) {
             // Calc's matrix-scalar power: text and error elements are NaN to
             // pow(), so x^0 and 1^y are 1 and anything else is #NUM!
-            const pre = [a, b].find((v) => !(v instanceof Matrix) && isErr(v) && !v.fromRef);
+            const pre = !node.fnPow && [a, b].find((v) => !(v instanceof Matrix) && isErr(v) && !v.fromRef);
             if (pre) return pre;
             const num = (v) => {
               if (v === null || v === undefined || v === EMPTYR || v === MISSING) return 0;
@@ -959,6 +959,12 @@
             }));
           }
           if (!ELEMENTWISE.has(name)) return mark(this.ev0(node, ctx));
+          if (name === 'POWER' && node.args.length === 2 && node.args.every((n) => n.t !== 'missing')) {
+            // POWER is Calc's ^ operator: over arrays it follows ^
+            const r = this.aev1({ t: 'bin', op: '^', a: node.args[0], b: node.args[1], fnPow: true }, ctx, sc);
+            if (r instanceof Matrix) return mark(r);
+            return mark(this.ev0(node, ctx));
+          }
           // when another argument is an array, a range argument is taken as
           // an array too (not intersected), except for POWER (Calc's ^)
           const raws = node.args.map((n) => (n.t === 'missing' ? MISSING : this.aev1(n, ctx, sc)));
