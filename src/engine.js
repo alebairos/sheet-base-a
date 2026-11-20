@@ -429,10 +429,17 @@
   // condition is false: skipped by aggregates (like an empty element) but
   // FALSE where it is taken as a value (epm marks those positions)
   const EPATH = { emptyPath: true };
+  // map a matrix's rows; a row that is the previous row's object (the blank
+  // rows past a sheet's data share one) gives the previous output row
+  const mapRows = (data, f) => {
+    const out = new Array(data.length);
+    for (let r = 0; r < data.length; r++) out[r] = r > 0 && data[r] === data[r - 1] ? out[r - 1] : f(data[r], r);
+    return out;
+  };
   const epath = (m) => {
-    if (!m.data.some((row) => row.includes(EPATH))) return m;
-    m.epm = m.data.map((row) => row.map((x) => x === EPATH));
-    m.data = m.data.map((row) => row.map((x) => (x === EPATH ? null : x)));
+    if (!m.data.some((row, r) => (r === 0 || row !== m.data[r - 1]) && row.includes(EPATH))) return m;
+    m.epm = mapRows(m.data, (row) => row.map((x) => x === EPATH));
+    m.data = mapRows(m.data, (row) => row.map((x) => (x === EPATH ? null : x)));
     return m;
   };
   const m00 = (m) => (m.epm && m.epm[0][0] ? EPATH : m.data[0][0]);
@@ -1236,17 +1243,29 @@
       if (isErr(v) && !v.fromRef && !this.pend) this.pend = { err: v, clr: this.clr, seq: ++this.errSeq };
       return v;
     }
+    // a range a scalar function takes as an array: one that runs to the
+    // sheet's last row or column ends at the last row and column with data,
+    // as Calc trims whole-column references there (none left: #N/A)
+    trimMatrix(v) {
+      if (v.r2 < MAXROW - 1 && v.c2 < MAXCOL - 1) return this.rangeMatrix(v);
+      const sh = v.sheet;
+      const r2 = Math.min(v.r2, sh.maxR), c2 = Math.min(v.c2, sh.maxC);
+      if (r2 < v.r1 || c2 < v.c1) return new Matrix([[E.NA]]);
+      return this.rangeMatrix(new Range(sh, v.r1, v.c1, r2, c2));
+    }
     rangeMatrix(v) {
       const sh = v.sheet;
-      // (as large as the range: cells past the data are empty elements; only
-      // a huge range is cut a row and a column past the data)
-      const big = (v.r2 - v.r1 + 1) * (v.c2 - v.c1 + 1) > 1 << 18;
+      // (as large as the range: cells past the data are empty elements, the
+      // rows past the data one shared row; only a range of more than 2^22
+      // cells is cut a row and a column past the data)
+      const big = (v.r2 - v.r1 + 1) * (v.c2 - v.c1 + 1) > 1 << 22;
       const r2 = big ? Math.min(v.r2, Math.max(v.r1, sh.maxR + 1)) : v.r2, c2 = big ? Math.min(v.c2, Math.max(v.c1, sh.maxC + 1)) : v.c2;
       const rd = Math.min(r2, Math.max(sh.maxR, v.r1 - 1)), cd = Math.min(c2, Math.max(sh.maxC, v.c1 - 1));
       const rows = [];
+      let blank = null;
       for (let r = v.r1; r <= r2; r++) {
+        if (r > rd) { if (!blank) blank = new Array(c2 - v.c1 + 1).fill(null); rows.push(blank); continue; }
         const row = [];
-        if (r > rd) { for (let c = v.c1; c <= c2; c++) row.push(null); rows.push(row); continue; }
         for (let c = v.c1; c <= c2; c++) { const x = c > cd ? null : this.cellValue(sh, r, c); row.push(x === EMPTYR ? null : x); }
         rows.push(row);
       }
@@ -1471,7 +1490,7 @@
             if (anyBool && res instanceof Matrix) res.boolRes = true;
             // (a cell's boolean an element takes is a plain number then: IF({1,2},A5,-1) is 0)
             else if (res instanceof Matrix && res.data.some((row) => row.some((x) => typeof x === 'boolean'))) {
-              const m = new Matrix(res.data.map((row) => row.map((x) => (typeof x === 'boolean' ? +x : x))));
+              const m = new Matrix(mapRows(res.data, (row) => row.map((x) => (typeof x === 'boolean' ? +x : x))));
               for (const k of Object.keys(res)) if (k !== 'data' && k !== 'rows' && k !== 'cols') m[k] = res[k];
               return m;
             }
@@ -1546,7 +1565,7 @@
           };
           const anyMat = raws.some((v) => one1(v) instanceof Matrix);
           const args = raws.map((v) => {
-            if (v instanceof Range) v = (!sc || (anyMat && name !== 'POWER')) && (v.rows > 1 || v.cols > 1) ? this.rangeMatrix(v) : this.intersect(v, ctx);
+            if (v instanceof Range) v = (!sc || (anyMat && name !== 'POWER')) && (v.rows > 1 || v.cols > 1) ? (name === 'NOT' ? this.rangeMatrix(v) : this.trimMatrix(v)) : this.intersect(v, ctx);
             else v = one1(v);
             return this.notePend(v);
           });
@@ -1603,7 +1622,10 @@
         return m.epm && m.epm[rr][cc] ? EPATH : m.data[rr][cc];
       };
       const out = [];
+      const mats = args.filter((m) => m instanceof Matrix && m.rows > 1);
       for (let r = 0; r < R; r++) {
+        // (a row whose operands repeat the previous row's gives that row's result)
+        if (r > 0 && mats.every((m) => r < m.rows && m.data[r] === m.data[r - 1] && (!m.epm || m.epm[r] === m.epm[r - 1]))) { out.push(out[r - 1]); continue; }
         const row = [];
         for (let c = 0; c < C; c++) {
           const xs = args.map((m) => at(m, r, c));

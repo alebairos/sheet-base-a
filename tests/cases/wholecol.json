@@ -1,0 +1,522 @@
+{
+ "pd0": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": "x y",
+    "A3": true,
+    "A4": "x y",
+    "E1": "=SUM(--(A:A=\"\"))",
+    "E2": "=SUMPRODUCT(--(Sheet2!B:B>=0))",
+    "E3": "=SUMPRODUCT(--(C:C<>\"a\"))",
+    "E4": "=SUMPRODUCT(--(Sheet2!A:A=0))"
+   },
+   "Sheet2": {
+    "A1": -3,
+    "A2": 1
+   }
+  }
+ },
+ "pd1": {
+  "sheets": {
+   "Sheet1": {
+    "A1": false,
+    "B1": true,
+    "A2": -3,
+    "B2": "x y",
+    "A3": true,
+    "B3": -3,
+    "A4": "x y",
+    "B4": "a",
+    "A5": "",
+    "B5": -3,
+    "A6": "5",
+    "B6": 2,
+    "E1": "=SUMPRODUCT(--ISNUMBER(C:C))",
+    "E2": "=SUMPRODUCT(--NOT(A:A))",
+    "E3": "=MAX(--(Sheet2!B:B=\"\"))",
+    "E4": "=MAX(--(B:B=\"\"))"
+   },
+   "Sheet2": {
+    "A1": true,
+    "A2": 2.5
+   }
+  }
+ },
+ "pd2": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 2.5,
+    "A2": false,
+    "A3": "5",
+    "A4": false,
+    "A5": false,
+    "E1": "=MATCH(TRUE,INDEX(B:B=\"\",0),0)",
+    "E2": "=SUMPRODUCT(--NOT(A:A))",
+    "E3": "=SUMPRODUCT(LEN(C:C&\"x\"))",
+    "E4": "=SUM(--(B:B=\"\"))"
+   },
+   "Sheet2": {
+    "A1": 7,
+    "A2": ""
+   }
+  }
+ },
+ "pd3": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "a",
+    "B1": "b",
+    "A2": 0,
+    "B2": false,
+    "C2": "",
+    "A3": 0,
+    "B3": 1,
+    "C3": "x y",
+    "A4": true,
+    "B4": 0,
+    "C4": "x y",
+    "E1": "=MATCH(0,INDEX(--(C:C<>\"\"),0),0)",
+    "E2": "=SUMPRODUCT(--ISBLANK(B:B))",
+    "E3": "=SUMPRODUCT(--ISBLANK(B:A))",
+    "E4": "=SUM(--(C:C=\"\"))"
+   },
+   "Sheet2": {
+    "A1": true,
+    "A2": false
+   }
+  }
+ },
+ "pd4": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 2,
+    "A2": 0,
+    "B2": "a",
+    "E1": "=SUMPRODUCT(N(+B:B))",
+    "E2": "=MATCH(1,B:B,1)",
+    "E3": "=SUMPRODUCT(--ISTEXT(B:B&\"\"))",
+    "E4": "=MATCH(\"zz\",C:C,1)"
+   },
+   "Sheet2": {
+    "A1": true,
+    "A2": "a"
+   }
+  }
+ },
+ "pd5": {
+  "sheets": {
+   "Sheet1": {
+    "A2": 2.5,
+    "B2": 0,
+    "A3": -3,
+    "B3": 10,
+    "A4": false,
+    "B4": 10,
+    "A5": 10,
+    "A6": 7,
+    "B6": 10,
+    "E1": "=SUMPRODUCT((C:C=\"\")*1)",
+    "E2": "=SUMPRODUCT(--(TRIM(B:B)=\"\"))",
+    "E3": "=SUMPRODUCT(--(C:C<>\"a\"))",
+    "E4": "=SUMPRODUCT(--ISNUMBER(Sheet2!B:B))"
+   },
+   "Sheet2": {
+    "A1": -3,
+    "A2": -3
+   }
+  }
+ },
+ "pd6": {
+  "sheets": {
+   "Sheet1": {
+    "B1": false,
+    "A2": false,
+    "B2": "b",
+    "E1": "=SUMPRODUCT(--(A:A<1))",
+    "E2": "=MATCH(1,C:C,1)",
+    "E3": "=SUMPRODUCT(--(TRIM(Sheet2!A:A)=\"\"))",
+    "E4": "=MATCH(TRUE,INDEX(Sheet2!C:C=\"\",0),0)"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": "5"
+   }
+  }
+ },
+ "pd7": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "B1": "5",
+    "C1": "x y",
+    "A2": 0,
+    "B2": 7,
+    "C2": 7,
+    "A3": 2.5,
+    "B3": "x y",
+    "C3": true,
+    "E1": "=SUMPRODUCT(--(TRIM(C:C)=\"\"))",
+    "E2": "=COUNT(1/(C:C=\"\"))",
+    "E3": "=MATCH(\"zz\",C:C,1)",
+    "E4": "=SUMPRODUCT(--(Sheet2!A:A=0))"
+   },
+   "Sheet2": {
+    "A1": "a",
+    "A2": 2.5
+   }
+  }
+ },
+ "pd8": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "x y",
+    "A2": "",
+    "A3": 2,
+    "A5": -3,
+    "A6": 10,
+    "E1": "=COUNT(1/(Sheet2!B:B=\"\"))",
+    "E2": "=SUM(--(Sheet2!C:C=\"\"))",
+    "E3": "=SUMPRODUCT(--ISTEXT(Sheet2!B:B&\"\"))",
+    "E4": "=SUMPRODUCT(--ISBLANK(A:B))"
+   },
+   "Sheet2": {
+    "A1": 2,
+    "A2": "x y"
+   }
+  }
+ },
+ "pd9": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 2,
+    "B1": 2.5,
+    "C1": 10,
+    "A2": "5",
+    "B2": "a",
+    "C2": 0,
+    "E1": "=SUMPRODUCT(--(Sheet2!C:C<>\"a\"))",
+    "E2": "=SUMPRODUCT(--ISTEXT(A:A&\"\"))",
+    "E3": "=SUMPRODUCT(--ISBLANK(C:B))",
+    "E4": "=SUMPRODUCT(--ISBLANK(C:A))"
+   },
+   "Sheet2": {
+    "A1": "",
+    "A2": -3
+   }
+  }
+ },
+ "pd10": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 2,
+    "B1": 10,
+    "C1": 2,
+    "A2": 2.5,
+    "B2": 10,
+    "C2": 10,
+    "A3": "b",
+    "B3": false,
+    "C3": 2.5,
+    "A4": "x y",
+    "C4": "5",
+    "A5": 2.5,
+    "B5": "5",
+    "C5": 2,
+    "A6": 1,
+    "B6": 10,
+    "C6": true,
+    "E1": "=SUM(--(A:A=\"\"))",
+    "E2": "=SUMPRODUCT(--ISERROR(1/Sheet2!B:B))",
+    "E3": "=SUMPRODUCT(--ISTEXT(A:A&\"\"))",
+    "E4": "=COUNT(1/(B:B=\"\"))"
+   },
+   "Sheet2": {
+    "A1": 7,
+    "A2": -3
+   }
+  }
+ },
+ "pd11": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 1,
+    "B2": "x y",
+    "B3": -3,
+    "E1": "=COUNT(1/(C:C=\"\"))",
+    "E2": "=MATCH(1,Sheet2!B:B,1)",
+    "E3": "=SUMPRODUCT(--(C:C=\"\"))",
+    "E4": "=SUMPRODUCT(--(UPPER(A:A)=\"\"))"
+   },
+   "Sheet2": {
+    "A1": "",
+    "A2": 2
+   }
+  }
+ },
+ "pd12": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 2.5,
+    "B1": "5",
+    "C1": "",
+    "A2": 2.5,
+    "B2": 2.5,
+    "C2": "a",
+    "B3": -3,
+    "C3": 2.5,
+    "A4": 0,
+    "B4": "b",
+    "C4": 2.5,
+    "A5": -3,
+    "B5": 10,
+    "C5": 2.5,
+    "E1": "=SUMPRODUCT(--(A:A=A:B))",
+    "E2": "=SUMPRODUCT(--(UPPER(B:B)=\"\"))",
+    "E3": "=SUMPRODUCT(--(C:C=C:B))",
+    "E4": "=SUMPRODUCT(--(LEN(Sheet2!C:C)=0))"
+   },
+   "Sheet2": {
+    "A1": 7,
+    "A2": 2
+   }
+  }
+ },
+ "pd13": {
+  "sheets": {
+   "Sheet1": {
+    "A2": true,
+    "A3": 10,
+    "A4": false,
+    "A5": "5",
+    "A6": "5",
+    "E1": "=SUMPRODUCT(--(A:A=0))",
+    "E2": "=SUMPRODUCT(--(B:B>=0))",
+    "E3": "=SUMPRODUCT(--(C:C<1))",
+    "E4": "=MATCH(1,Sheet2!C:C,1)"
+   },
+   "Sheet2": {
+    "A1": false,
+    "A2": -3
+   }
+  }
+ },
+ "pd14": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 7,
+    "B1": "5",
+    "A2": -3,
+    "B2": "",
+    "A3": "b",
+    "B3": false,
+    "A4": 1,
+    "B4": false,
+    "A5": true,
+    "B5": 2.5,
+    "E1": "=SUMPRODUCT(N(+C:C))",
+    "E2": "=SUMPRODUCT(--ISTEXT(Sheet2!A:A&\"\"))",
+    "E3": "=SUMPRODUCT(--(TRIM(C:C)=\"\"))",
+    "E4": "=SUMPRODUCT(--(B:B<1))"
+   },
+   "Sheet2": {
+    "A1": false,
+    "A2": "5"
+   }
+  }
+ },
+ "pd15": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 2,
+    "A2": "",
+    "A4": -3,
+    "A5": 2,
+    "E1": "=COUNT(1/(Sheet2!C:C=\"\"))",
+    "E2": "=SUMPRODUCT(N(+B:B))",
+    "E3": "=SUMPRODUCT(--(TRIM(Sheet2!B:B)=\"\"))",
+    "E4": "=MATCH(0,INDEX(--(B:B<>\"\"),0),0)"
+   },
+   "Sheet2": {
+    "A1": 0,
+    "A2": "5"
+   }
+  }
+ },
+ "pd16": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": "a",
+    "A3": 2,
+    "E1": "=MATCH(0,INDEX(--(A:A<>\"\"),0),0)",
+    "E2": "=SUMPRODUCT((C:C=\"\")*1)",
+    "E3": "=SUMPRODUCT(--(A:A<>\"a\"))",
+    "E4": "=SUMPRODUCT(--(LEN(B:B)=0))"
+   },
+   "Sheet2": {
+    "A1": -3,
+    "A2": "5"
+   }
+  }
+ },
+ "pd17": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "x y",
+    "B1": "5",
+    "C1": "5",
+    "A2": true,
+    "B2": false,
+    "E1": "=SUMPRODUCT(--(C:C=B:B))",
+    "E2": "=MATCH(0,INDEX(--(B:B<>\"\"),0),0)",
+    "E3": "=MATCH(0,INDEX(--(Sheet2!C:C<>\"\"),0),0)",
+    "E4": "=COUNT(1/(A:A=\"\"))"
+   },
+   "Sheet2": {
+    "A1": "",
+    "A2": 1
+   }
+  }
+ },
+ "pd18": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "a",
+    "C1": 0,
+    "A2": -3,
+    "B2": "a",
+    "C2": "a",
+    "A3": 2.5,
+    "B3": -3,
+    "A4": "b",
+    "B4": "5",
+    "C4": "b",
+    "A5": 10,
+    "B5": 2.5,
+    "C5": "a",
+    "E1": "=MATCH(0,INDEX(--(C:C<>\"\"),0),0)",
+    "E2": "=SUMPRODUCT(--ISBLANK(C:C))",
+    "E3": "=MATCH(0,INDEX(--(B:B<>\"\"),0),0)",
+    "E4": "=SUMPRODUCT(--NOT(C:C))"
+   },
+   "Sheet2": {
+    "A1": 0,
+    "A2": false
+   }
+  }
+ },
+ "pd19": {
+  "sheets": {
+   "Sheet1": {
+    "B1": 7,
+    "C1": false,
+    "A2": "",
+    "B2": 10,
+    "C2": 10,
+    "A3": true,
+    "C3": 2.5,
+    "E1": "=SUMPRODUCT(--(B:B=A:A))",
+    "E2": "=SUMPRODUCT(--(Sheet2!C:C=\"\"))",
+    "E3": "=SUMPRODUCT(--(Sheet2!A:A<>\"a\"))",
+    "E4": "=SUMPRODUCT(--ISERROR(1/B:B))"
+   },
+   "Sheet2": {
+    "A1": 0,
+    "A2": false
+   }
+  }
+ },
+ "pd20": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "",
+    "A3": 2,
+    "A4": false,
+    "E1": "=SUMPRODUCT(--(LEN(Sheet2!A:A)=0))",
+    "E2": "=COUNT(1/(Sheet2!B:B=\"\"))",
+    "E3": "=SUMPRODUCT(--(A:A<>\"a\"))",
+    "E4": "=SUMPRODUCT(N(+Sheet2!B:B))"
+   },
+   "Sheet2": {
+    "A1": "b",
+    "A2": "a"
+   }
+  }
+ },
+ "pd21": {
+  "sheets": {
+   "Sheet1": {
+    "A2": false,
+    "A3": true,
+    "A4": "b",
+    "A5": 1,
+    "E1": "=SUMPRODUCT(--ISBLANK(B:B))",
+    "E2": "=SUMPRODUCT(LEN(C:C&\"x\"))",
+    "E3": "=MATCH(0,INDEX(--(Sheet2!C:C<>\"\"),0),0)",
+    "E4": "=SUMPRODUCT(--(B:B<1))"
+   },
+   "Sheet2": {
+    "A1": 0,
+    "A2": "b"
+   }
+  }
+ },
+ "pd22": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 2,
+    "A2": 10,
+    "A3": "a",
+    "A4": 2.5,
+    "E1": "=MATCH(TRUE,INDEX(B:B=\"\",0),0)",
+    "E2": "=SUMPRODUCT(N(+Sheet2!C:C))",
+    "E3": "=MATCH(0,INDEX(--(A:A<>\"\"),0),0)",
+    "E4": "=MATCH(1,A:A,1)"
+   },
+   "Sheet2": {
+    "A1": 7,
+    "A2": 10
+   }
+  }
+ },
+ "pd23": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 2.5,
+    "B1": true,
+    "C1": "5",
+    "A2": "a",
+    "C2": "5",
+    "E1": "=SUMPRODUCT(--ISERROR(1/C:C))",
+    "E2": "=SUMPRODUCT(N(+B:B))",
+    "E3": "=SUMPRODUCT(--ISNUMBER(A:A))",
+    "E4": "=SUMPRODUCT(--(Sheet2!A:A<1))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": true
+   }
+  }
+ },
+ "pd24": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "A2": 2,
+    "A3": "",
+    "A4": "a",
+    "A5": "b",
+    "E1": "=SUMPRODUCT(--ISERROR(1/C:C))",
+    "E2": "=SUMPRODUCT(--ISNUMBER(B:B))",
+    "E3": "=MATCH(\"zz\",C:C,1)",
+    "E4": "=SUMPRODUCT((B:B=\"\")*1)"
+   },
+   "Sheet2": {
+    "A1": 2,
+    "A2": 2.5
+   }
+  }
+ }
+}
