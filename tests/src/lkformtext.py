@@ -1,7 +1,8 @@
 # Approximate lookups over columns mixing constant text, text from formulas,
 # numbers, formula numbers, blanks and errors (Calc skips only constant text
 # at the start of a numeric sorted search).
-# Run: python3 tests/src/lkformtext.py <seed> <count> > tests/cases/lkformtext.json; then tools/lo_oracle.py
+# Run: python3 tests/src/lkformtext.py <seed> <count> [row] > tests/cases/lkformtext.json; then tools/lo_oracle.py
+# (row: the data along row 1, looked up with HLOOKUP and MATCH over a row)
 import json, random, sys
 random.seed(int(sys.argv[1]) if len(sys.argv) > 1 else 1)
 N = int(sys.argv[2]) if len(sys.argv) > 2 else 200
@@ -18,12 +19,21 @@ for t in range(N):
     n = random.randint(2, 9)
     d = {}
     # mostly ascending numbers with a few odd cells, to look like real data
+    ROW = len(sys.argv) > 3 and sys.argv[3] == "row"
     for r in range(1, n + 1):
         v = cell()
-        if v is not None: d[f"A{r}"] = v
-        d[f"B{r}"] = r * 10
+        a, b = (f"{'ABCDEFGHI'[r-1]}1", f"{'ABCDEFGHI'[r-1]}2") if ROW else (f"A{r}", f"B{r}")
+        if v is not None: d[a] = v
+        d[b] = r * 10
     qs = [random.choice([0, 0.7, 2, 4, 6, 9, 20, '"m"', '"b"', '"zz"', '"3"', 'TRUE'])]
     for i, q in enumerate(qs):
+        if ROW:
+            L = 'ABCDEFGHI'[n-1]
+            d["A4"] = f"=HLOOKUP({q},A1:{L}2,2,1)"
+            d["A5"] = f"=MATCH({q},A1:{L}1,1)"
+            d["A6"] = f"=MATCH({q},A1:{L}1,-1)"
+            d["A7"] = f"=HLOOKUP({q},A1:{L}2,2,0)"
+            continue
         d["D1"] = f"=VLOOKUP({q},A1:B{n},2,1)"
         d["D2"] = f"=MATCH({q},A1:A{n},1)"
         d["D3"] = f"=MATCH({q},A1:A{n},-1)"

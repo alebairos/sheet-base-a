@@ -2487,7 +2487,10 @@
       for (let k = foundRow + 1; k < n; k++) {
         const c = list[k];
         if (c === null) continue;
-        if (isStr(c) === byStr && c !== ERRC && cmp(c) === 0) foundRow = k; else break;
+        // (a text hit also goes on over numbers whose text equals it: "3", 3)
+        if (isStr(c) === byStr && c !== ERRC && cmp(c) === 0) foundRow = k;
+        else if (byStr && typeof c === 'number' && strCmp(fmtNum(c), q) === 0) foundRow = k;
+        else break;
       }
     }
     return foundRow;
