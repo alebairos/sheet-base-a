@@ -1051,7 +1051,7 @@
     let s = '';
     for (let i = 0; i < pat.length; i++) {
       const ch = pat[i];
-      if (ch === '~' && i + 1 < pat.length && '*?~'.indexOf(pat[i + 1]) >= 0) { s += '\\' + pat[++i]; continue; }
+      if (ch === '~' && i + 1 < pat.length) { s += pat[++i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); continue; } // ~ escapes any character
       if (ch === '*') s += '[\\s\\S]*';
       else if (ch === '?') s += '[\\s\\S]';
       else s += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
