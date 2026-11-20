@@ -73,6 +73,12 @@
       eq('json error', cell(1, 0).textContent, '#DIV/0!');
       const json2 = JSON.parse(await save('btn-save-json'));
       eq('json round trip', JSON.stringify(json2), JSON.stringify({ sheets: { S1: { A1: 4, A2: '=A1/0' }, S2: { A1: '=S1!A1+1' } } }));
+      // a sheet named like an integer keeps its place (tabs, 3D references, save)
+      await open('years.json', '{"sheets": {"Main": {"A1": "=SUM(Main:\'2024\'!B1)", "B1": 1}, "2024": {"B1": 5}, "Last": {"B1": 100}}}');
+      eq('numbered tabs', $('sheet-tabs').textContent, 'Main2024Last');
+      eq('numbered 3D sum', cell(0, 0).textContent, '6');
+      const json3 = await save('btn-save-json');
+      eq('numbered save order', json3 && json3.indexOf('"Main"') < json3.indexOf('"2024"'), true);
     } catch (e) {
       fails.push('exception ' + e.message);
     }
