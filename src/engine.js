@@ -2209,7 +2209,10 @@
             }
             if (first) return { err: last || first };
           }
-          for (const row of v.data) for (const x of row) {
+          // (column by column, as Calc stores and walks a matrix: the first
+          // error met that way is the result)
+          for (let c = 0; c < v.cols; c++) for (let r = 0; r < v.rows; r++) {
+            const x = v.data[r][c];
             if (typeof x === 'number') { nums.push(x); } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
             else if (isErr(x) && !opts.skipErrors) return { err: x };
           }
@@ -2996,16 +2999,18 @@
     const nums = [];
     let err = null;
     if (a.rg instanceof Matrix) {
-      a.rg.data.forEach((row, r) => row.forEach((v, c) => {
+      // (column by column, as Calc walks a matrix: the first error met wins)
+      for (let c = 0; c < a.rg.cols; c++) for (let r = 0; r < a.rg.rows; r++) {
+        const v = a.rg.data[r][c];
         // (an error element of a computed array matches any criterion)
-        if (err || !(isErr(v) || a.match(v))) return;
+        if (err || !(isErr(v) || a.match(v))) continue;
         let sv = a.sum instanceof Matrix ? (a.sum.data[r] ? a.sum.data[r][c] : undefined)
           : self.cellValue(a.sum.sheet, a.sum.r1 + r, a.sum.c1 + c);
         if (sv === EMPTYR) sv = 0;
         if (typeof sv === 'number') nums.push(sv);
         else if (typeof sv === 'boolean') nums.push(sv ? 1 : 0);
         else if (isErr(sv)) err = sv;
-      }));
+      }
       return err ? { err } : { nums };
     }
     const blankMatches = a.match(null);
@@ -3199,7 +3204,9 @@
         } else if (v instanceof Matrix) {
           // an inline or computed array holding text or an empty element is
           // an invalid argument
-          for (const row of v.data) for (const x of row) {
+          // (column by column, as Calc walks a matrix)
+          for (let c = 0; c < v.cols; c++) for (let r = 0; r < v.rows; r++) {
+            const x = v.data[r][c];
             if (isErr(x)) return x;
             if (typeof x === 'number' || typeof x === 'boolean') { acc = combine(acc, !!+x); any = true; } else if (typeof x === 'string' || x === null) return E.IARG;
           }
