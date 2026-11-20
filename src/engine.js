@@ -786,6 +786,7 @@
       else {
         const ctx = { sheet: sh, r: cell.r, c: cell.c };
         const clr = this.clr, pend = this.pend; // each cell has its own pending error (own interpreter)
+        const seen = this.errSeen, lce = this.lastChildErr;
         this.pend = null;
         try {
           v = this.finalValue(this.ev(cell.ast, ctx), ctx);
@@ -796,6 +797,7 @@
         }
         this.clr = clr;
         this.pend = pend;
+        this.errSeen = seen; this.lastChildErr = lce;
       }
       if (isErr(v)) v = asComputed(v);
       cell.value = v;
@@ -990,7 +992,12 @@
       const mark = (m) => { if (sc && m instanceof Matrix && !m.jm) { const e = m.epm; m = new Matrix(m.data); m.jm = true; if (e) m.epm = e; } return m; };
       const jmOf = (r, ms) => { if (sc) r.jm = ms.filter((m) => m instanceof Matrix).every((m) => m.jm); return r; };
       switch (node.t) {
-        case 'paren': return this.aev(node.a, ctx, sc);
+        case 'paren': {
+          // (brackets do not consume an error: no pending error of their own)
+          let v = this.aev1(node.a, ctx, sc);
+          if (v instanceof Range) v = sc ? this.intersect(v, ctx) : this.rangeMatrix(v);
+          return v;
+        }
         case 'neg': case 'pct': {
           const a = this.aev(node.a, ctx, sc);
           if (!(a instanceof Matrix)) return this.ev0(node, ctx);
@@ -1050,9 +1057,12 @@
             for (let k = 1; k < node.args.length; k++) {
               const before = this.pend;
               // with an array condition a range branch is taken as an array
+              this.lastChildErr = false;
               let b = node.args[k].t === 'missing' ? MISSING : this.aev1(node.args[k], ctx, sc);
               if (b instanceof Range) b = this.rangeMatrix(b);
-              if (isErr(b) && !b.fromRef && !this.pend) this.pend = { err: b, clr: this.clr };
+              // a branch's error is only the element's, unless a computed
+              // error went through a further operation in the branch
+              if (isErr(b) && !b.fromRef && !this.pend && this.lastChildErr) this.pend = { err: b, clr: this.clr };
               // a branch no element takes neither leaves a pending error nor sizes the result
               if (name === 'IF' ? !used(k) : k === 1 && !used(1)) { this.pend = before; b = null; }
               // the condition's size holds where it is above 1; a branch only
@@ -1188,7 +1198,24 @@
       if ((node.t === 'bin' || node.t === 'neg' || node.t === 'pct' || node.t === 'fn') && hasArr(node)) return this.aev(node, ctx, true);
       return this.ev0(node, ctx);
     }
+    // errSeen: a computed error came out of a part of the formula evaluated
+    // so far (within the current node); lastChildErr: the node evaluated
+    // last had such an error among its parts (it consumed a computed error)
     ev0(node, ctx) {
+      const t = node.t;
+      if (t !== 'fn' && t !== 'bin' && t !== 'neg' && t !== 'pct') {
+        const r = this.ev0x(node, ctx);
+        if (isErr(r) && !r.fromRef) this.errSeen = true;
+        return r;
+      }
+      const s = this.errSeen;
+      this.errSeen = false;
+      const r = this.ev0x(node, ctx);
+      this.lastChildErr = this.errSeen;
+      this.errSeen = s || (isErr(r) && !r.fromRef);
+      return r;
+    }
+    ev0x(node, ctx) {
       switch (node.t) {
         case 'num': return node.v;
         case 'str': return node.v;
