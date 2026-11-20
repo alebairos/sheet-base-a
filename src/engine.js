@@ -1595,27 +1595,31 @@
     }
     return s;
   });
+  // Calc's LEN/LEFT/RIGHT/MID count Unicode code points, not UTF-16 units
+  const codePoints = (s) => Array.from(s);
+  const cpCount = (s) => codePoints(s).length;
   def('LEFT', 1, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n'], [undefined, 1]); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
     if (n < 0) return E.VALUE;
-    return a[0].slice(0, n);
+    return codePoints(a[0]).slice(0, n).join('');
   });
   def('RIGHT', 1, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n'], [undefined, 1]); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
     if (n < 0) return E.VALUE;
-    return n === 0 ? '' : a[0].slice(Math.max(0, a[0].length - n));
+    const cps = codePoints(a[0]);
+    return n === 0 ? '' : cps.slice(Math.max(0, cps.length - n)).join('');
   });
   def('MID', 3, 3, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n', 'n']); if (isErr(a)) return a;
     const st = Math.trunc(a[1]), n = Math.trunc(a[2]);
     if (st < 1 || n < 0) return E.VALUE;
-    return a[0].substr(st - 1, n);
+    return codePoints(a[0]).slice(st - 1, st - 1 + n).join('');
   });
   def('LEN', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s']); if (isErr(a)) return a;
-    return a[0].length;
+    return cpCount(a[0]);
   });
   def('UPPER', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s']); if (isErr(a)) return a;
@@ -1623,7 +1627,7 @@
   });
   def('LOWER', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s']); if (isErr(a)) return a;
-    return a[0].toLowerCase();
+    return a[0].replace(/[^\u0130]+/g, (m) => m.toLowerCase()); // ICU keeps dotted capital I
   });
   def('TRIM', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s']); if (isErr(a)) return a;
@@ -1652,15 +1656,16 @@
     const st = Math.trunc(a[2]);
     if (st < 1 || st > a[1].length + 1 || a[0] === '') return E.VALUE;
     const i = a[1].indexOf(a[0], st - 1);
-    return i < 0 ? E.VALUE : i + 1;
+    // the start is in UTF-16 units, the result in code points (as Calc does)
+    return i < 0 ? E.VALUE : cpCount(a[1].slice(0, i)) + 1;
   });
   def('SEARCH', 2, 3, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 's', 'n'], [undefined, undefined, 1]); if (isErr(a)) return a;
     const st = Math.trunc(a[2]);
     if (st < 1 || st > a[1].length + 1) return E.VALUE;
-    const re = new RegExp(wildcardRe(a[0]).source.slice(1, -1), 'i');
+    const re = new RegExp(wildcardRe(a[0]).source.slice(1, -1), 'iu');
     const m = re.exec(a[1].slice(st - 1));
-    return m ? m.index + st : E.VALUE;
+    return m ? cpCount(a[1].slice(0, m.index + st - 1)) + 1 : E.VALUE;
   });
 
   def('ISNA', 1, 1, function (nodes, ctx) { const v = this.sv(nodes[0], ctx); return isErr(v) && v.code === '#N/A'; });
@@ -1801,11 +1806,17 @@
     const a = this.args(nodes, ctx, ['n']); if (isErr(a)) return a;
     const n = Math.trunc(a[0]);
     if (n < 1 || n > 255) return E.VALUE;
-    return n < 128 ? String.fromCharCode(n) : new TextDecoder('windows-1252').decode(new Uint8Array([n]));
+    // Calc decodes the byte in the system encoding (UTF-8): a lone byte >= 128 is invalid
+    return n < 128 ? String.fromCharCode(n) : '\uFFFD';
   });
   def('CODE', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s']); if (isErr(a)) return a;
-    return a[0] === '' ? E.VALUE : a[0].charCodeAt(0);
+    if (a[0] === '') return E.VALUE;
+    // Calc converts the first character to the system encoding (UTF-8) and gives its first byte
+    const u = a[0].charCodeAt(0);
+    if (u < 0x80) return u;
+    if (u >= 0xD800 && u <= 0xDFFF) return 0;
+    return new TextEncoder().encode(a[0][0])[0];
   });
   def('CHOOSE', 2, undefined, function (nodes, ctx) {
     const a = this.args(nodes.slice(0, 1), ctx, ['n']); if (isErr(a)) return a;
