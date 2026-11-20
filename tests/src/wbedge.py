@@ -17,4 +17,9 @@ wb("w4", Sheet1={"A1":"=IF(FALSE,B1,5)","B1":"=A1+1"})
 wb("w5", Sheet1={"A1":"=ISERROR(B1)","B1":"=A1"})
 wb("w6", Sheet1={"A1":"=ROW()","B2":"=COLUMN()","C3":"=ROWS(A1:B5)*COLUMNS(A1:C1)","A4":"=INDEX(A1:C3,0,0)","A5":"=INDEX(A1:C3,1,0)","A6":"=MATCH(3,C1:C3)","A7":"=VLOOKUP(\"x\",A1:A1,1)"})
 wb("w7", Sheet1={"A1":"= ","A2":"==","A3":"=+=1","A4":"= =1","A5":"=\n1","A6":"===1","A7":"=","B7":"=ISBLANK(A7)","A8":"==A6+1","B8":"=A7&\"x\"","B9":"=COUNTA(A1:A8)","B10":"=ISTEXT(A7)"})
+# formula cells read by force-array functions are computed as ordinary formulas
+wb("fa_cells", Sheet1={"A1":1,"A2":2,"A3":3,"B1":10,"B2":20,"B3":30,
+  "D1":"=MAX(A1:A3*B1:B3)","D2":"=A1:A3*2","D3":"=SUM(A1:A3*B1:B3)","D4":"=IF(A1:A3>1,1,0)",
+  "E1":"=SUMPRODUCT(D1:D4)","E2":"=MATCH(30,D1:D4,0)","E3":"=SUMPRODUCT(D1:D4*1)","E4":"=VLOOKUP(2,D1:D4,1,0)",
+  "E5":"=SUMPRODUCT(MAX(D1:D4*A1:A4))","E6":"=INDEX(D1:D4,0)","E7":"=MATCH(1,INDEX((D1:D4>1)*1,0),0)"})
 print(json.dumps(W))
