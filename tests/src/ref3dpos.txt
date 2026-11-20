@@ -1,0 +1,12 @@
+# 3D references in scalar positions, formula in C2
+=Sheet1!A1:Sheet2!A1
+=Sheet1:Sheet2!A1
+=Sheet1:Sheet2!A1+1
+=Sheet2:Sheet1!A1*2
+=Sheet2!A1:Sheet1!A1
+=LEN(Sheet1:Sheet2!A1)
+=Sheet1:Sheet2!C2
+=Sheet1:Sheet2!A1:A3
+=Sheet1:Sheet2!B1:B3+0
+=IF(Sheet1:Sheet2!A1,1,2)
+=ABS(Sheet1:Sheet2!A1)

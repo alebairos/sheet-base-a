@@ -364,6 +364,8 @@
   class RefList {
     constructor(ranges) { this.ranges = ranges; }
   }
+  // a 3D reference (Sheet1:Sheet3!A1): one range per sheet
+  const refList3d = (ranges) => { const l = new RefList(ranges); l.is3d = true; return l; };
   const MISSING = { missing: true };
   // result of calling an unknown function with arguments: #NAME?, but
   // IFERROR/ISERROR turn it into #VALUE! instead of catching it
@@ -384,6 +386,7 @@
     const toks = [];
     let i = 0;
     const n = src.length;
+    const fail0 = (msg, code) => { const e = new SyntaxError(msg); e.code = code; throw e; };
     const refRe = /^(\$?[A-Za-z]{1,3}\$?\d+)(?::(\$?[A-Za-z]{1,3}\$?\d+))?/;
     const colRangeRe = /^(\$?[A-Za-z]{1,3}):(\$?[A-Za-z]{1,3})(?![\w(])/;
     const rowRangeRe = /^(\$?\d+):(\$?\d+)(?![\w(.])/;
@@ -481,7 +484,23 @@
         }
         const m = /^(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?/.exec(src.slice(i));
         if (!m) throw new SyntaxError('bad number');
-        toks.push({ t: 'num', v: Number(m[0]) });
+        const after = src.slice(i + m[0].length);
+        // a number running into letters is one (unknown) name, as in Calc
+        // (2x, 1E5E5), unless a signed exponent ended it (1e+5x); an
+        // unfinished exponent before anything but the end or a sign is a
+        // syntax error (1e*2)
+        if (/^[A-Za-z_]/.test(after) && !/[eE][+-]/.test(m[0])) {
+          const w = /^[\w.]*/.exec(after)[0];
+          const next = after.slice(w.length);
+          if (/^[eE]$/.test(w) && next !== '' && !/^[+-]/.test(next)) fail0('bad exponent', 'Err:509');
+          toks.push({ t: 'name', v: m[0] + w });
+          i += m[0].length + w.length;
+          continue;
+        }
+        const v = Number(m[0]);
+        // a literal beyond the double range is an error for the whole formula
+        if (!isFinite(v) || (v === 0 && /[1-9]/.test(m[1]))) fail0('number out of range', 'Err:503');
+        toks.push({ t: 'num', v });
         i += m[0].length;
         continue;
       }
@@ -566,7 +585,16 @@
     }
     function rangeop1() {
       let a = primary();
-      while (isOp(':')) { p++; a = { t: 'rangeop', a, b: primary() }; }
+      // an unqualified reference after a qualified one is on that one's sheet
+      // (Sheet2!A1:B2:A3); different sheets make a 3D reference
+      let sheet = a.t === 'ref' ? a.sheet : null;
+      while (isOp(':')) {
+        p++;
+        let b = primary();
+        if (b.t === 'ref' && b.sheet === null && sheet !== null && !b.b) b = { ...b, sheet };
+        if (b.t === 'ref') sheet = b.sheet;
+        a = { t: 'rangeop', a, b };
+      }
       return a;
     }
     function args() {
@@ -750,7 +778,11 @@
     finalValue(v, ctx) {
       if (v instanceof Range) v = this.intersect(v, ctx);
       else if (v instanceof Matrix) v = v.data[0][0];
-      else if (v instanceof RefList) v = E.VALUE;
+      else if (v instanceof RefList) {
+        // a 3D reference as the result: the formula's own sheet's range, if
+        // it is among the sheets (inside operations it is an error)
+        v = v.is3d ? this.own3d(v, ctx) : E.VALUE;
+      }
       if (v === null) return EMPTYR;
       if (v === MISSING || isLB(v)) return 0;
       if (typeof v === 'number') {
@@ -788,8 +820,18 @@
     scalar(v, ctx) {
       if (v instanceof Range) return this.intersect(v, ctx);
       if (v instanceof Matrix) return v.data[0][0];
-      if (v instanceof RefList) return E.IARG;
+      if (v instanceof RefList) return v.is3d ? this.own3d(v, ctx) : E.IARG;
       return v;
+    }
+    // a 3D reference in a scalar position: its range on the formula's own
+    // sheet, intersected with the formula's row or column (also one cell)
+    own3d(v, ctx) {
+      const own = ctx && v.ranges.find((x) => x.sheet === ctx.sheet);
+      if (!own) return E.VALUE;
+      if (own.c1 === own.c2 && ctx.r >= own.r1 && ctx.r <= own.r2) return this.cellValue(own.sheet, ctx.r, own.c1);
+      if (own.r1 === own.r2 && ctx.c >= own.c1 && ctx.c <= own.c2) return this.cellValue(own.sheet, own.r1, ctx.c);
+      if (ctx.r >= own.r1 && ctx.r <= own.r2 && ctx.c >= own.c1 && ctx.c <= own.c2) return this.cellValue(own.sheet, ctx.r, ctx.c);
+      return E.VALUE;
     }
 
     sv(node, ctx) { return this.scalar(this.ev(node, ctx), ctx); }
@@ -1148,7 +1190,7 @@
           const b = node.b || node.a;
           const ranges = [];
           for (let k = i1; k <= i2; k++) ranges.push(new Range(this.wb.sheets[k], node.a.r, node.a.c, b.r, b.c));
-          return ranges.length === 1 ? ranges[0] : new RefList(ranges);
+          return ranges.length === 1 ? ranges[0] : refList3d(ranges);
         }
         case 'isect': {
           const a = this.ev(node.a, ctx), b = this.ev(node.b, ctx);
@@ -1175,8 +1217,24 @@
           const a = this.ev(node.a, ctx), b = this.ev(node.b, ctx);
           if (isErr(a)) return a;
           if (isErr(b)) return b;
-          if (!(a instanceof Range) || !(b instanceof Range) || a.sheet !== b.sheet) return E.VALUE;
-          return new Range(a.sheet, Math.min(a.r1, b.r1), Math.min(a.c1, b.c1), Math.max(a.r2, b.r2), Math.max(a.c2, b.c2));
+          if (a instanceof Range && b instanceof Range && a.sheet === b.sheet) {
+            return new Range(a.sheet, Math.min(a.r1, b.r1), Math.min(a.c1, b.c1), Math.max(a.r2, b.r2), Math.max(a.c2, b.c2));
+          }
+          // across sheets (Sheet1!A1:Sheet2!B2): a 3D reference over the
+          // sheets between, in workbook order
+          const parts = [];
+          for (const x of [a, b]) {
+            if (x instanceof Range) parts.push(x);
+            else if (x instanceof RefList && x.is3d && node.b.t === 'ref' && node.b.sheet !== null) parts.push(...x.ranges);
+            else return E.VALUE;
+          }
+          const idx = parts.map((x) => this.wb.sheets.indexOf(x.sheet));
+          const i1 = Math.min(...idx), i2 = Math.max(...idx);
+          const r1 = Math.min(...parts.map((x) => x.r1)), r2 = Math.max(...parts.map((x) => x.r2));
+          const c1 = Math.min(...parts.map((x) => x.c1)), c2 = Math.max(...parts.map((x) => x.c2));
+          const ranges = [];
+          for (let k = i1; k <= i2; k++) ranges.push(new Range(this.wb.sheets[k], r1, c1, r2, c2));
+          return refList3d(ranges);
         }
         case 'neg': {
           let depth = 1, inner = node.a;
@@ -2435,11 +2493,13 @@
   def('ROWS', 1, 1, function (nodes, ctx) {
     const v = this.ev(nodes[0], ctx);
     if (isErr(v)) return v;
+    if (v instanceof RefList && v.is3d) return v.ranges.length * v.ranges[0].rows; // Calc counts each sheet's rows
     return v instanceof Range || v instanceof Matrix ? v.rows : E.PARAM;
   });
   def('COLUMNS', 1, 1, function (nodes, ctx) {
     const v = this.ev(nodes[0], ctx);
     if (isErr(v)) return v;
+    if (v instanceof RefList && v.is3d) return v.ranges.length * v.ranges[0].cols;
     return v instanceof Range || v instanceof Matrix ? v.cols : E.PARAM;
   });
   // OFFSET(ref, rows, cols, [height], [width]): a reference moved and resized
@@ -2622,6 +2682,7 @@
     let row = Math.trunc(a[0]);
     let col = a[1] === undefined ? undefined : Math.trunc(a[1]);
     let tgt = ref;
+    if (ref instanceof RefList && ref.is3d) return E.REF;
     if (ref instanceof RefList) {
       // a reference list: the area-th reference
       const k = Math.trunc(a[2]);
