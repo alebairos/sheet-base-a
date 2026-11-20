@@ -2195,7 +2195,8 @@
     }
     const critErr = isErr(crit) && crit.tok ? crit : null;
     if (isErr(rg)) return count ? rg : critErr || E.VALUE;
-    if (!(rg instanceof Range) && !(rg instanceof Matrix)) return critErr || E.PARAM;
+    // (a criterion read from an error cell is popped first: its error wins)
+    if (!(rg instanceof Range) && !(rg instanceof Matrix)) return isErr(crit) ? crit : E.PARAM;
     if (crit === MISSING || isLB(crit)) crit = null;
     if (crit === EMPTYR) crit = 0;
     const match = makeCriterion(crit);
