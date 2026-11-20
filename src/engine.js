@@ -1560,7 +1560,7 @@
     // opts.skipErrors: errors are ignored (COUNT)
     collect(nodes, ctx, opts) {
       const nums = [];
-      const vals = [];
+      const vals = [], fmtVals = []; // (fmtVals: in parameter order, sheets first to last)
       const evs = [];
       for (const node of nodes) {
         if (node.t === 'missing') { evs.push([0, this.clr]); continue; } // an empty argument is 0
@@ -1570,7 +1570,8 @@
       for (let [v, clr] of evs) {
         if (clr !== this.clr) v = demote(v);
         if (isErr(v) && !v.fromRef && !opts.skipErrors) return { err: v };
-        if (v instanceof RefList) vals.push(...v.ranges); else vals.push(v);
+        // (a 3D reference is one parameter: its sheets are taken first to last)
+        if (v instanceof RefList) { vals.push(...(v.is3d && !opts.forward ? v.ranges.slice().reverse() : v.ranges)); fmtVals.push(...v.ranges); } else { vals.push(v); fmtVals.push(v); }
       }
       // Calc pops parameters from the stack: the last one is examined first
       // (MEDIAN gathers its parameters into an array first: first one first)
@@ -1662,7 +1663,7 @@
       // order (text and blank cells skipped): a boolean cell makes the result
       // a boolean, a computed or constant value a number.
       let boolFmt = false;
-      for (const v of vals) {
+      for (const v of fmtVals) {
         if (!(v instanceof Range)) {
           if (typeof v === 'number' || typeof v === 'boolean' || v instanceof Matrix) break;
           continue;

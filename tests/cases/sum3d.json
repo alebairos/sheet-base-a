@@ -1,0 +1,258 @@
+{
+ "3d:=SUM(Data:Calc!A1:B2)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=SUM(Data:Calc!A1:B2)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=SUM(Data:Calc!A1)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=SUM(Data:Calc!A1)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=AVERAGE(Data:Calc!A1:B2)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=AVERAGE(Data:Calc!A1:B2)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=PRODUCT(Data:Calc!A1)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=PRODUCT(Data:Calc!A1)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=MIN(Data:Calc!A1)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=MIN(Data:Calc!A1)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=MAX(Data:Calc!A1:B2)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=MAX(Data:Calc!A1:B2)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=MEDIAN(Data:Calc!A1)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=MEDIAN(Data:Calc!A1)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=STDEV(Data:Calc!A1)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=STDEV(Data:Calc!A1)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=AND(Data:Calc!A1)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=AND(Data:Calc!A1)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=COUNT(Data:Calc!A1:B2)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=COUNT(Data:Calc!A1:B2)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=SUM(Calc:Data!A1)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=SUM(Calc:Data!A1)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=SUM('My Sheet':Calc!A1)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=SUM('My Sheet':Calc!A1)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=SUM(Data:Calc!B1:B2)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=SUM(Data:Calc!B1:B2)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=SUM(Data:Calc!A1,1)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=SUM(Data:Calc!A1,1)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=SUM(1,Data:Calc!A1)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=SUM(1,Data:Calc!A1)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ },
+ "3d:=CONCATENATE(Data:Calc!A1)": {
+  "sheets": {
+   "Data": {
+    "A1": 0.5,
+    "D8": "=CONCATENATE(Data:Calc!A1)"
+   },
+   "My Sheet": {
+    "A1": "=3<>SUM(A:A)",
+    "B1": false
+   },
+   "Calc": {
+    "A1": "=1/0",
+    "A2": false
+   }
+  }
+ }
+}
