@@ -688,14 +688,17 @@
       if (cell.parseError || !cell.ast) v = cell.parseError ? errByCode(cell.parseError) : null;
       else {
         const ctx = { sheet: sh, r: cell.r, c: cell.c };
-        const clr = this.clr; // each cell has its own pending error (own interpreter)
+        const clr = this.clr, pend = this.pend; // each cell has its own pending error (own interpreter)
+        this.pend = null;
         try {
           v = this.finalValue(this.ev(cell.ast, ctx), ctx);
+          if (this.pend && this.pend.clr === this.clr) v = this.pend.err;
         } catch (e) {
           if (e instanceof RangeError) v = E.VALUE; // stack overflow etc.
           else throw e;
         }
         this.clr = clr;
+        this.pend = pend;
       }
       if (isErr(v)) v = asComputed(v);
       cell.value = v;
@@ -823,8 +826,12 @@
     // sc: ranges are intersected with the formula cell (an ordinary formula
     // whose inline arrays still compute element by element)
     aev(node, ctx, sc) {
-      const v = this.aev1(node, ctx, sc);
-      return v instanceof Range ? (sc ? this.intersect(v, ctx) : this.rangeMatrix(v)) : v;
+      let v = this.aev1(node, ctx, sc);
+      if (v instanceof Range) v = sc ? this.intersect(v, ctx) : this.rangeMatrix(v);
+      // a scalar error met among array operations stays pending (Calc's
+      // nGlobalError): it is the formula's result unless a reset follows
+      if (isErr(v) && !v.fromRef && !this.pend) this.pend = { err: v, clr: this.clr };
+      return v;
     }
     rangeMatrix(v) {
       const sh = v.sheet;
@@ -881,8 +888,22 @@
           if (name === 'IF' || name === 'IFERROR') {
             // a scalar condition/value picks a whole branch; an array one picks
             // element by element (IF without an else branch leaves the element empty)
-            const args = node.args.map((n) => (n.t === 'missing' ? MISSING : this.aev(n, ctx, sc)));
-            if (!(args[0] instanceof Matrix)) return mark(this.ev0(node, ctx));
+            const pend0 = this.pend;
+            const first = node.args[0].t === 'missing' ? MISSING : this.aev(node.args[0], ctx, sc);
+            if (!(first instanceof Matrix)) { this.pend = pend0; return mark(this.ev0(node, ctx)); }
+            // a branch no element takes leaves no pending error behind
+            const used = (k) => first.data.some((row) => row.some((x) => {
+              if (name === 'IFERROR') return k === 1 && isErr(x);
+              if (isErr(x)) return false;
+              const b = this.toBool(x);
+              return !isErr(b) && (k === 1 ? b : !b);
+            }));
+            const args = [first];
+            for (let k = 1; k < node.args.length; k++) {
+              const before = this.pend;
+              args.push(node.args[k].t === 'missing' ? MISSING : this.aev(node.args[k], ctx, sc));
+              if (name === 'IF' ? !used(k) : k === 1 && !used(1)) this.pend = before;
+            }
             const noElse = name === 'IF' && node.args.length < 3;
             return mark(this.amap(args, (...xs) => {
               const r = asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx));
