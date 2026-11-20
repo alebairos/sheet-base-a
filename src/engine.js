@@ -2537,10 +2537,11 @@
     const m = Math.pow(10, Math.abs(d));
     let v = d >= 0 ? x * m : x / m;
     if (!isFinite(v)) return x;
-    v = approxValue(v);
+    if (mode !== 0) v = approxValue(v);
     const s = v < 0 ? -1 : 1;
     let a = Math.abs(v);
-    if (mode === 0) a = Math.floor(a + 0.5);
+    // (rounding to nearest is approxFloor(a + 0.5): ROUND(0.5-10*2^-54,0) is 1)
+    if (mode === 0) a = approxFloor(a + 0.5);
     else if (mode > 0) a = Math.ceil(a);
     else a = Math.floor(a);
     a *= s;
