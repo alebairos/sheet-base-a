@@ -1866,6 +1866,8 @@
       if (top) { top.fe = null; top.sup = (top.sup || 0) + 1; }
       let r;
       try { r = f.fn.call(this, node.args, ctx); } finally { if (top) top.sup--; }
+      // (as Calc's PushDouble: a result that is not finite is #NUM!)
+      if (typeof r === 'number' && !isFinite(r)) r = E.NUM;
       if (CLEARS_ERROR.has(node.name)) {
         this.clr++;
         if (node.ef && node.name !== 'IFERROR') this.efRan(node);
@@ -2575,7 +2577,7 @@
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }, { forward: true, textParam: true }, 1);
   // variance: values in Calc's order (parameters last to first, cells first to last)
-  aggregate('STDEV', (n, b, parts) => (n.length < 2 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), false))), { textParam: true, noTok: true });
+  aggregate('STDEV', (n, b, parts) => (n.length < 2 ? E.DIV0 : finite(Math.sqrt(variance(popOrder(parts), false)))), { textParam: true, noTok: true });
 
   const variance = (n, pop) => {
     const mean = kahan(n) / n.length;
@@ -2583,9 +2585,9 @@
     for (const x of n) { const d = approxSub(x, mean); ss += d * d; } // rtl::math::approxSub
     return ss / (n.length - (pop ? 0 : 1));
   };
-  aggregate('VAR', (n, b, parts) => (n.length < 2 ? E.DIV0 : variance(popOrder(parts), false)), { textParam: true, noTok: true });
-  aggregate('VARP', (n, b, parts) => (n.length < 1 ? E.DIV0 : variance(popOrder(parts), true)), { textParam: true, noTok: true });
-  aggregate('STDEVP', (n, b, parts) => (n.length < 1 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), true))), { textParam: true, noTok: true });
+  aggregate('VAR', (n, b, parts) => (n.length < 2 ? E.DIV0 : finite(variance(popOrder(parts), false))), { textParam: true, noTok: true });
+  aggregate('VARP', (n, b, parts) => (n.length < 1 ? E.DIV0 : finite(variance(popOrder(parts), true))), { textParam: true, noTok: true });
+  aggregate('STDEVP', (n, b, parts) => (n.length < 1 ? E.DIV0 : finite(Math.sqrt(variance(popOrder(parts), true)))), { textParam: true, noTok: true });
   const kth = (largest) => function (nodes, ctx) {
     if (nodes.length !== 2) return E.VALUE;
     const r = this.collect([nodes[0]], ctx, { textParam: true });
@@ -2712,7 +2714,8 @@
   def('QUOTIENT', 2, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n', 'n']); if (isErr(a)) return a;
     if (a[1] === 0) return E.IARG;
-    return Math.trunc(approxValue(a[0] / a[1]));
+    const q = Math.trunc(approxValue(a[0] / a[1]));
+    return isFinite(q) ? q : E.IARG; // (an add-in: an overflow is an invalid argument)
   });
   const toMultiple = (up) => function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n', 'n']); if (isErr(a)) return a;
