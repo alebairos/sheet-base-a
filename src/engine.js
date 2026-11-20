@@ -1319,7 +1319,9 @@
           let collapsed = false;
           const one1 = (v) => {
             if (name === 'NOT' || inl) return v;
-            const o = one(v);
+            let o = one(v);
+            // (the IS functions see an empty-path element as empty text)
+            if (o === EPATH && /^IS/.test(name)) o = '';
             if (o !== v) { collapsed = true; return asRefErr(o); }
             return o;
           };
