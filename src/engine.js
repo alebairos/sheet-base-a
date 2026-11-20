@@ -1389,8 +1389,9 @@
       return typeof x === 'number' && (exact ? v === x : approxEqual(v, x));
     }
     if (typeof v === 'string') {
-      // text is compared with the cell's displayed text (numbers too)
-      if (typeof x === 'number') x = fmtNum(x);
+      // text is compared with a cell's displayed text (numbers too); an
+      // inline array's numbers never equal text
+      if (typeof x === 'number') { if (exact) return false; x = fmtNum(x); }
       else if (typeof x === 'boolean') x = x ? 'TRUE' : 'FALSE';
       if (typeof x !== 'string') return false;
       if (hasWild(v)) return wildcardRe(v).test(x);
@@ -1491,7 +1492,9 @@
   // ranges: 'col' (a cell column: Calc's binary search), 'row' (a cell row:
   // Calc's sequential search); anything else (inline arrays) uses a simple
   // approximation. On sorted data all agree with Calc.
-  function lookupPos(list, v, mode, ranges) {
+  // numsBelowText (MATCH over an inline array): in an ascending search numbers
+  // are below a text value
+  function lookupPos(list, v, mode, ranges, numsBelowText) {
     if (typeof v === 'boolean') v = v ? 1 : 0;
     // an ascending wildcard search over cells: the first cell the pattern
     // matches (and the matching cells right after it); without one, a sorted
@@ -1511,7 +1514,8 @@
     if (mode > 0) {
       let best = -1;
       for (let i = 0; i < list.length; i++) {
-        const c = lookupCmp(list[i], v);
+        const x = list[i];
+        const c = numsBelowText && typeof v === 'string' && (typeof x === 'number' || typeof x === 'boolean') ? -1 : lookupCmp(x, v);
         if (c === null) continue;
         if (c === 0) return i;
         if (c < 0) best = i;
@@ -2418,13 +2422,15 @@
     if (isErr(rg)) return rg;
     if (rg === MISSING) return E.PARAM;
     if (isErr(rest)) return rest;
+    // the match type is truncated: -1, 0 or 1, anything else is a parameter error
+    const mode = Math.trunc(rest[0]);
+    if (mode < -1 || mode > 1) return E.PARAM;
     if (isErr(v)) return v;
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.NA;
     if (rg.rows !== 1 && rg.cols !== 1) return E.PARAM;
     if (v === null) return E.NA;
     const list = this.firstLine(rg, rg.cols !== 1);
-    const mode = rest[0] > 0 ? 1 : rest[0] < 0 ? -1 : 0;
-    const i = lookupPos(list, v, mode, rg instanceof Range ? (rg.cols === 1 ? 'col' : 'row') : null);
+    const i = lookupPos(list, v, mode, rg instanceof Range ? (rg.cols === 1 ? 'col' : 'row') : null, true);
     return i < 0 ? E.NA : i + 1;
   });
   def('INDEX', 1, 4, function (nodes, ctx) {
