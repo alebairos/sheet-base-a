@@ -1513,6 +1513,14 @@
               const v = this.aev(node.args[i], ctx, sc, true);
               return LOOKUPS.has(name) ? v : one(v);
             });
+            // (beside an inline array a range there is taken as an array too:
+            // SUM(MATCH(A1:A2,A1:A3,{0,1})) is a 2x2 result)
+            if (sc && mp.some((i) => node.args[i] && node.args[i].t === 'arr')) {
+              mp.forEach((i, k) => {
+                const n = node.args[i];
+                if (n && n.t === 'ref' && n.b && (n.a.r !== n.b.r || n.a.c !== n.b.c)) { const v = this.aev(n, ctx, false, true); args[k] = LOOKUPS.has(name) ? v : one(v); }
+              });
+            }
             if (!args.some((m) => m instanceof Matrix)) return mark(this.ev0(node, ctx));
             // (a computed error as the range or sum range of SUMIF/COUNTIF/
             // AVERAGEIF is the formula's error, not each element's:
@@ -1524,6 +1532,13 @@
                 const v = this.ev(n, ctx);
                 if (isErr(v) && !v.fromRef && !v.tok) { this.pend = { err: v, clr: this.clr }; break; }
               }
+            }
+            // (a computed error as the lookup array or table while the formula
+            // goes on past errors is a token there: #VALUE!, as in a scalar lookup;
+            // not with an array lookup value, VLOOKUP({1;2},NA(),2)+COUNT(1) is #N/A)
+            if (LOOKUPS.has(name) && !(args[0] instanceof Matrix) && node.args[1] && node.args[1].t !== 'ref' && node.args[1].t !== 'missing' && this.efDone < this.efTotal) {
+              const tv = this.ev(node.args[1], ctx);
+              if (isErr(tv) && (tv.cont || (!tv.fromRef && !tv.tok && this.contErr(tv)))) return E.VALUE;
             }
             return mark(this.amap(args, (...xs) => {
               const a2 = node.args.slice();
@@ -3468,7 +3483,7 @@
     'ISNONTEXT', 'ISREF', 'COUNT', 'COUNTA', 'N']);
   // parameters that take one value: an array there gives one result per element
   const LOOKUPS = new Set(['VLOOKUP', 'HLOOKUP', 'MATCH']);
-  const MAPPED_PARAMS = { COUNTIF: [1], SUMIF: [1], AVERAGEIF: [1], VLOOKUP: [0, 2], HLOOKUP: [0, 2], MATCH: [0], INDEX: [1, 2],
+  const MAPPED_PARAMS = { COUNTIF: [1], SUMIF: [1], AVERAGEIF: [1], VLOOKUP: [0, 2, 3], HLOOKUP: [0, 2, 3], MATCH: [0, 2], INDEX: [1, 2],
     LARGE: [1], SMALL: [1] };
   const ADDIN = new Set(['QUOTIENT', 'RANDBETWEEN']);
   const ELEMENTWISE = new Set(['IF', 'IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISNA', 'ISERR', 'ISLOGICAL',
