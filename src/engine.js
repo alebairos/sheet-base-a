@@ -1438,6 +1438,12 @@
       // for SUM's rounding: Calc's pop order, each item a number or the
       // numbers of one column of a range
       const parts = [];
+      // error tokens popped later overwrite the error (the first one wins)
+      const tokOver = (k, e) => {
+        if (opts.forward || opts.noTok) return e;
+        for (let j = 0; j < k; j++) if (isErr(vals[j]) && vals[j].tok) return vals[j];
+        return e;
+      };
       for (let j = 0; j < vals.length; j++) {
         const k = opts.forward ? j : vals.length - 1 - j;
         const v = vals[k];
@@ -1477,13 +1483,17 @@
             }
             return true;
           }, false, pre);
-          if (err) return { err };
+          // a range's error only marks the result: an error token among the
+          // parameters popped later replaces it (SUM(#N/A,A12) is #N/A
+          // whatever A12's error), except that a larger range's error ends
+          // SUM's scan
+          if (err) return { err: (v.rows === 1 && v.cols === 1) || !opts.colLastErr ? tokOver(k, err) : err };
         } else if (v instanceof Matrix) {
           for (const row of v.data) for (const x of row) {
             if (typeof x === 'number') { nums.push(x); } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
             else if (isErr(x) && !opts.skipErrors) return { err: x };
           }
-        } else if (typeof v === 'number') { nums.push(v); } else if (typeof v === 'boolean') { nums.push(v ? 1 : 0); } else if (v === EMPTYR || isLB(v)) { nums.push(0); } else if (isErr(v)) { if (!opts.skipErrors) return { err: v }; } else if (typeof v === 'string') {
+        } else if (typeof v === 'number') { nums.push(v); } else if (typeof v === 'boolean') { nums.push(v ? 1 : 0); } else if (v === EMPTYR || isLB(v)) { nums.push(0); } else if (isErr(v)) { if (!opts.skipErrors) return { err: tokOver(k, v) }; } else if (typeof v === 'string') {
           const n = textToNum(v);
           if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: tokBefore(opts.forward || opts.noTok ? [] : vals, k, opts.textParam ? E.PARAM : E.VALUE) };
         }
