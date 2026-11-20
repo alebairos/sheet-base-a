@@ -805,7 +805,9 @@
         vals.push(v);
       }
       // Calc pops parameters from the stack: the last one is examined first
-      for (let k = vals.length - 1; k >= 0; k--) {
+      // (MEDIAN gathers its parameters into an array first: first one first)
+      for (let j = 0; j < vals.length; j++) {
+        const k = opts.forward ? j : vals.length - 1 - j;
         const v = vals[k];
         if (v instanceof Range) {
           let err = null;
@@ -825,7 +827,7 @@
           if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: E.VALUE };
         }
       }
-      nums.reverse();
+      if (!opts.forward) nums.reverse();
       // MIN/MAX take the number format of the first value of the first
       // parameter: a boolean cell there makes the result a boolean.
       let boolFmt = false;
@@ -977,17 +979,94 @@
     if (typeof x !== 'string') return null;
     return strCmp(x, v);
   }
+  // Calc's lookup in "sorted" mode over cells (ScQueryCellIterator::
+  // FindEqualOrSortedLastInRange): numbers sort before text; a numeric query
+  // skips text cells, a text query may skip one leading text cell; a binary
+  // search (columns only) positions the start, then cells are walked while
+  // they satisfy the condition, and an exact hit extends over equal entries.
+  function sortedLookup(list0, q, asc, binary) {
+    // an error cell is a non-text cell that never satisfies the condition
+    const ERRC = { err: true };
+    const list = list0.map((x) => x === null ? null : isErr(x) ? ERRC : x === EMPTYR ? '' : typeof x === 'boolean' ? +x : x);
+    const n = list.length, byStr = typeof q === 'string';
+    const isStr = (x) => typeof x === 'string';
+    const cmp = (c) => (byStr ? strCmp(c, q) : c === ERRC ? (approxEqual(0, q) ? 0 : 0 < q ? -1 : 1) : (approxEqual(c, q) ? 0 : c < q ? -1 : 1));
+    const firstStringIgnore = byStr, allStringIgnore = !byStr;
+    let row = 0;
+    if (firstStringIgnore && isStr(list[0])) {
+      const t = cmp(list[0]);
+      if ((asc && t > 0) || (!asc && t < 0)) row++;
+    }
+    while (row < n && list[row] === null) row++;
+    if (allStringIgnore) while (row < n && (list[row] === null || isStr(list[row]))) row++;
+    let start = row;
+    if (binary && row < n) {
+      const idx = [];
+      for (let i = row; i < n; i++) if (list[i] !== null) idx.push(i);
+      let lo = 0, hi = idx.length - 1, last = 0, found = null, done = false, broken = false;
+      let lastV = asc ? -Infinity : Infinity, lastS = asc ? '' : '￿';
+      if (isStr(list[idx[0]])) lastS = list[idx[0]]; else lastV = list[idx[0]] === ERRC ? 0 : list[idx[0]];
+      while (lo <= hi && !done) {
+        const mid = (lo + hi) >> 1, c = list[idx[mid]];
+        let r = 0;
+        if (!isStr(c) && !byStr) {
+          r = cmp(c);
+          const cv = c === ERRC ? 0 : c;
+          if (r < 0 && asc) { if (lastV <= cv) { lastV = cv; last = mid; } else broken = true; }
+          else if (r > 0 && !asc) { if (lastV >= cv) { lastV = cv; last = mid; } else broken = true; }
+        } else if (isStr(c) && byStr) {
+          r = cmp(c);
+          if (r < 0 && asc) { if (strCmp(lastS, c) <= 0) { lastS = c; last = mid; } else broken = true; }
+          else if (r > 0 && !asc) { if (strCmp(lastS, c) >= 0) { lastS = c; last = mid; } else broken = true; }
+        } else if (!isStr(c)) { r = -1; if (asc) last = mid; } else { r = 1; if (!asc) last = mid; }
+        if (broken) break;
+        if (r < 0) { if (asc) lo = mid + 1; else if (mid > 0) hi = mid - 1; else done = true; }
+        else if (r > 0) { if (asc) { if (mid > 0) hi = mid - 1; else done = true; } else lo = mid + 1; }
+        else { found = mid; last = mid; if (mid > 0) hi = mid - 1; else done = true; }
+      }
+      start = broken ? idx[0] : found !== null ? idx[found] : idx[last];
+    }
+    if (!asc) {
+      // descending data cannot start below the value
+      for (let k = row; k < n; k++) {
+        const c = list[k];
+        if (c === null || c === ERRC || isStr(c) !== byStr) continue;
+        if (cmp(c) < 0) return -1;
+        break;
+      }
+    }
+    let foundRow = -1, fsi = firstStringIgnore, eq = false;
+    for (let r = start; r < n; r++) {
+      const c = list[r];
+      if (c === null || (allStringIgnore && isStr(c))) continue;
+      if (isStr(c) === byStr && c !== ERRC) {
+        const t = cmp(c);
+        if (asc ? t <= 0 : t >= 0) { foundRow = r; fsi = false; if (t === 0) { eq = true; break; } continue; }
+      }
+      if (fsi && isStr(c)) { fsi = false; continue; }
+      break;
+    }
+    if (eq) {
+      for (let k = foundRow + 1; k < n; k++) {
+        const c = list[k];
+        if (c === null || (allStringIgnore && isStr(c))) continue;
+        if (isStr(c) === byStr && c !== ERRC && cmp(c) === 0) foundRow = k; else break;
+      }
+    }
+    return foundRow;
+  }
   // position (0-based) in a 1-D list, or -1.
   // mode 0: exact (wildcards); 1: largest <= v; -1: smallest >= v.
-  // On sorted data these agree with Calc; on unsorted data they approximate
-  // Calc's searches (ascending: scan until the first greater value of the same
-  // type; descending: binary search over the values of the same type).
-  function lookupPos(list, v, mode) {
+  // ranges: 'col' (a cell column: Calc's binary search), 'row' (a cell row:
+  // Calc's sequential search); anything else (inline arrays) uses a simple
+  // approximation. On sorted data all agree with Calc.
+  function lookupPos(list, v, mode, ranges) {
     if (typeof v === 'boolean') v = v ? 1 : 0;
     if (mode === 0 || (typeof v === 'string' && hasWild(v))) {
       for (let i = 0; i < list.length; i++) if (lookupEq(v, list[i])) return i;
       return -1;
     }
+    if (ranges === 'col' || ranges === 'row') return sortedLookup(list, v, mode > 0, ranges === 'col');
     if (mode > 0) {
       let best = -1;
       for (let i = 0; i < list.length; i++) {
@@ -1049,7 +1128,7 @@
     const s = n.slice().sort((a, b) => a - b);
     const m = s.length >> 1;
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-  }, {}, 1);
+  }, { forward: true }, 1);
   aggregate('STDEV', (n) => {
     if (n.length < 2) return E.DIV0;
     const mean = kahan(n) / n.length;
@@ -1496,7 +1575,7 @@
     if (row < 1 || row > tbl.rows) return E.VALUE;
     if (v === null) return E.NA;
     const g = this.grid(tbl);
-    const i = lookupPos(g[0], v, sorted ? 1 : 0);
+    const i = lookupPos(g[0], v, sorted ? 1 : 0, tbl instanceof Range ? 'row' : null);
     if (i < 0) return E.NA;
     let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + row - 1, tbl.c1 + i) : g[row - 1][i];
     if (out === EMPTYR) out = 0;
@@ -1521,7 +1600,7 @@
     if (v === null) return E.NA;
     const g = this.grid(tbl);
     const first = g.map((row) => row[0]);
-    const i = lookupPos(first, v, sorted ? 1 : 0);
+    const i = lookupPos(first, v, sorted ? 1 : 0, tbl instanceof Range ? 'col' : null);
     if (i < 0) return E.NA;
     let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + i, tbl.c1 + col - 1) : g[i][col - 1];
     if (out === EMPTYR) out = 0;
@@ -1542,7 +1621,7 @@
     const g = this.grid(rg);
     const list = rg.cols === 1 ? g.map((row) => row[0]) : g[0];
     const mode = rest[0] > 0 ? 1 : rest[0] < 0 ? -1 : 0;
-    const i = lookupPos(list, v, mode);
+    const i = lookupPos(list, v, mode, rg instanceof Range ? (rg.cols === 1 ? 'col' : 'row') : null);
     return i < 0 ? E.NA : i + 1;
   });
   def('INDEX', 1, 4, function (nodes, ctx) {
