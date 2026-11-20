@@ -1,0 +1,62 @@
+= 1+2
+=SUM( A1 , A2 )
+=  A1  +  A2
+=A1 + -A2
+="a""b"
+=""""
+=LEN("a""b")
+=true
+=TRUE+0
+=not(false)
+=If(1,"y","n")
+=1 + 2 * 3
+=( 1 + 2 ) * 3
+=SUM (A1:A2)
+=A1 :A2
+=SUM(A1: A2)
+=-A1:A2
+="ü"&"ß"
+=UPPER("straße")
+=LOWER("ÀÉÎ")
+=LEN("日本語")
+=LEFT("日本語",2)
+=TRIM("　a　")
+=CHAR(65)&CODE("A")
+="a"<"b"
+="a"<"B"
+="B"<"a"
+="Z"<"a"
+="1"<"a"
+="10"<"9"
+="abc"="ABC"
+="é"="e"
+="e"<"é"
+="é"<"f"
+="a b"<"ab"
+="a-b"<"ab"
+="_"<"a"
+="!"<"a"
+="1"<"!"
+=" "<"!"
+="a"<"ä"
+="ä"<"b"
+=EXACT("a","A")
+=MATCH("é",{"e","é"},0)
+=COUNTIF(A10:B11,"APPLE")
+=SUMIF(A1:A3,">=2",B1:B3)
+=1=TRUE
+=0=FALSE
+="TRUE"=TRUE
+=TRUE>FALSE
+=TRUE<2
+="a">TRUE
+=A6=FALSE
+=A6<1
+=A6>-1
+=A6=B11
+UPPER("straße")
+PROPER("straße")
+LOWER("STRAẞE")
+UPPER("ﬁ")
+UPPER("ǆ")
+PROPER("ǆa")

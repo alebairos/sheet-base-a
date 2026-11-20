@@ -1472,7 +1472,7 @@
   });
   def('UPPER', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s']); if (isErr(a)) return a;
-    return a[0].toUpperCase();
+    return a[0].replace(/ß/g, 'ẞ').toUpperCase(); // ICU keeps sharp s one letter
   });
   def('LOWER', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s']); if (isErr(a)) return a;
