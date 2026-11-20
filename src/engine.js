@@ -2119,7 +2119,7 @@
     if (eq) {
       for (let k = foundRow + 1; k < n; k++) {
         const c = list[k];
-        if (c === null || (allStringIgnore && isStr(c))) continue;
+        if (c === null) continue;
         if (isStr(c) === byStr && c !== ERRC && cmp(c) === 0) foundRow = k; else break;
       }
     }
