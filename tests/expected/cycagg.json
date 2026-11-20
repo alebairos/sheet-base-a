@@ -1,0 +1,445 @@
+{
+ "AVERAGE1": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "AVERAGE2": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": 5,
+    "D1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "AVERAGE3": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "AVERAGE4": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "B2": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "AVERAGE5": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "A2": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "AVERAGE6": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "AVERAGE7": {
+  "sheets": {
+   "Sheet1": {
+    "A1": true,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "PRODUCT1": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "PRODUCT2": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": 5,
+    "D1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "PRODUCT3": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "PRODUCT4": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "B2": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "PRODUCT5": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "A2": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "PRODUCT6": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "PRODUCT7": {
+  "sheets": {
+   "Sheet1": {
+    "A1": true,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "SUM1": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": 2
+   }
+  }
+ },
+ "SUM2": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": 5,
+    "D1": 2
+   }
+  }
+ },
+ "SUM3": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": 1,
+    "C1": 2
+   }
+  }
+ },
+ "SUM4": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "B2": 3,
+    "C1": 2
+   }
+  }
+ },
+ "SUM5": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "A2": 3,
+    "C1": 2
+   }
+  }
+ },
+ "SUM6": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "SUM7": {
+  "sheets": {
+   "Sheet1": {
+    "A1": true,
+    "B1": 2,
+    "C1": 3
+   }
+  }
+ },
+ "MAX1": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": 2
+   }
+  }
+ },
+ "MAX2": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": 5,
+    "D1": 2
+   }
+  }
+ },
+ "MAX3": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": 1,
+    "C1": 2
+   }
+  }
+ },
+ "MAX4": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "B2": 3,
+    "C1": 2
+   }
+  }
+ },
+ "MAX5": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "A2": 3,
+    "C1": 2
+   }
+  }
+ },
+ "MAX6": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "MAX7": {
+  "sheets": {
+   "Sheet1": {
+    "A1": true,
+    "B1": 2,
+    "C1": 3
+   }
+  }
+ },
+ "COUNT1": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "COUNT2": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": 5,
+    "D1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "COUNT3": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "COUNT4": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "B2": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "COUNT5": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "A2": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "COUNT6": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 0,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "COUNT7": {
+  "sheets": {
+   "Sheet1": {
+    "A1": false,
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ }
+}

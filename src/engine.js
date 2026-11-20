@@ -1976,13 +1976,9 @@
           // it, and the column's error ends the scan.
           // (cells a block's error skips are not computed: no false cycles)
           let prevR = -2, prevF = false, blockErr = false, pcol = -1, stop = false;
-          // opts.colCont (AVERAGE, PRODUCT): an error ends its column, the
-          // later columns are still computed; the first error is the result
-          let colErr = false, ccol = -1, lastCol = false;
-          const pre = opts.colCont ? (r, c) => {
-            if (c !== ccol) { ccol = c; colErr = false; if (lastCol) stop = true; }
-            return colErr || stop;
-          } : opts.colLastErr ? (r, c) => {
+          // opts.colCont (AVERAGE, PRODUCT): every cell of the range is
+          // computed, also past errors; the first error is the result
+          const pre = opts.colCont ? null : opts.colLastErr ? (r, c) => {
             if (c !== pcol) { pcol = c; prevR = -2; if (err) stop = true; }
             if (stop) return true;
             const cell = v.sheet.cells.get(r * MAXCOL + c);
@@ -2006,9 +2002,7 @@
             } else blk = null;
             if (typeof x === 'number' || typeof x === 'boolean') {}
             else if (isErr(x) && !opts.skipErrors) {
-              // (a cell being computed, Err:522, does not end its column, but
-              // no later column is computed)
-              if (opts.colCont) { if (!err) err = x; if (x.code !== 'Err:522') colErr = true; else lastCol = true; return true; }
+              if (opts.colCont) { if (!err) err = x; return true; }
               err = x; blockErr = true; return !!opts.colLastErr;
             }
             return true;
