@@ -900,6 +900,7 @@
     constructor(json) {
       this.wb = new Workbook(json);
       this.clr = 0; // count of pending-error resets (see CLEARS_ERROR)
+      this.errSeq = 0;
     }
 
     // value of a cell (evaluating formulas), null for blank
@@ -945,7 +946,10 @@
         this.pend = null;
         try {
           v = this.finalValue(this.ev(cell.ast, ctx), ctx);
-          if (this.pend && this.pend.clr === this.clr) v = this.pend.err;
+          // (a scalar error computed before the pending one ended the formula first)
+          const fe = this.running[this.running.length - 1].se;
+          const earlier = fe && fe.clr === this.clr && this.pend && fe.seq < this.pend.seq && fe.err.code !== this.pend.err.code && isErr(v) && !v.tok;
+          if (this.pend && this.pend.clr === this.clr && !earlier) v = this.pend.err;
           // (the interpreter went on past an error no function cleared: that error)
           else if (this.gerr && this.gerr.clr === this.clr && !(isErr(v) && v.tok)) v = this.gerr.err;
         } catch (e) {
@@ -1221,7 +1225,7 @@
     notePend(v) {
       if (this.inElem && this.fa) return v; // (an element's error, in a force-array context)
       if (isErr(v) && !v.fromRef && !v.tok) { const t = this.contErr(v); if (t) return t; }
-      if (isErr(v) && !v.fromRef && !this.pend) this.pend = { err: v, clr: this.clr };
+      if (isErr(v) && !v.fromRef && !this.pend) this.pend = { err: v, clr: this.clr, seq: ++this.errSeq };
       return v;
     }
     rangeMatrix(v) {
@@ -1617,6 +1621,8 @@
       if (isErr(r) && !r.fromRef && !r.tok && this.running) {
         const top = this.running[this.running.length - 1];
         if (top && !top.sup && (!top.fe || top.fe.clr !== this.clr)) top.fe = { err: r, clr: this.clr };
+        // (the first scalar error, not an array element's, for the pending error's order)
+        if (top && !this.inElem && (!top.se || top.se.clr !== this.clr)) top.se = { err: r, clr: this.clr, seq: ++this.errSeq };
       }
       this.lastChildErr = this.errSeen;
       this.errSeen = s || (isErr(r) && !r.fromRef);
