@@ -25,4 +25,6 @@ assert.strictEqual(run(['-', '--cell', 'Sheet1!H1'], JSON.stringify(wb)).trim(),
 assert.strictEqual(run(['-', '--cell', 'Sheet1!B1'], JSON.stringify(wb)).trim(), '1'); n++;
 assert.strictEqual(run(['-', '--cell', 'Sheet1!A2'], JSON.stringify(wb)).trim(), '"text"'); n++;
 assert.strictEqual(run(['-', '--cell', 'Sheet1!H2'], JSON.stringify(wb)).trim(), 'true'); n++;
+assert.strictEqual(run(['-', '--cell', 'Sheet1!A1'], JSON.stringify({ sheets: { Sheet1: { a1: '=2' } } })).trim(), '2'); n++;
+assert.strictEqual(run(['-', '--cell', "'My Sheet'!$B$1"], JSON.stringify({ sheets: { 'My Sheet': { B1: '=1+1' } } })).trim(), '2'); n++;
 console.log(`cli: ${n} passed`);

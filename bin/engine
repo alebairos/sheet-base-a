@@ -53,6 +53,9 @@ if (cell === null) {
     process.stderr.write(`engine: bad cell address: ${addr}\n`);
     process.exit(1);
   }
-  const v = Object.prototype.hasOwnProperty.call(out.sheets[key], a) ? out.sheets[key][a] : null;
+  const cells = out.sheets[key];
+  const k = Object.prototype.hasOwnProperty.call(cells, a) ? a
+    : Object.keys(cells).find((x) => x.replace(/\$/g, '').toUpperCase() === a);
+  const v = k === undefined ? null : cells[k];
   process.stdout.write(JSON.stringify(v) + '\n');
 }

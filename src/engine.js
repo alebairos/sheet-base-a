@@ -1766,12 +1766,12 @@
   def('ROWS', 1, 1, function (nodes, ctx) {
     const v = this.ev(nodes[0], ctx);
     if (isErr(v)) return v;
-    return v instanceof Range || v instanceof Matrix ? v.rows : 1;
+    return v instanceof Range || v instanceof Matrix ? v.rows : E.VALUE;
   });
   def('COLUMNS', 1, 1, function (nodes, ctx) {
     const v = this.ev(nodes[0], ctx);
     if (isErr(v)) return v;
-    return v instanceof Range || v instanceof Matrix ? v.cols : 1;
+    return v instanceof Range || v instanceof Matrix ? v.cols : E.VALUE;
   });
   const ELEMENTWISE = new Set(['IF', 'IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISNA', 'ISERR', 'ISLOGICAL',
     'ISNONTEXT', 'LEN', 'ABS', 'ROUND', 'ROUNDUP', 'ROUNDDOWN', 'INT', 'TRUNC', 'SIGN', 'NOT', 'UPPER', 'LOWER', 'LEFT',
@@ -1924,7 +1924,8 @@
     let col = a[1] === undefined ? undefined : Math.trunc(a[1]);
     if (Math.trunc(a[2]) !== 1) return a[2] < 1 ? E.VALUE : E.REF; // a single area
     let tgt = ref;
-    if (!(tgt instanceof Range) && !(tgt instanceof Matrix)) tgt = new Matrix([[tgt]]);
+    const scalar = !(tgt instanceof Range) && !(tgt instanceof Matrix);
+    if (scalar) { if (row < 0 || (col !== undefined && col < 0)) return E.VALUE; return E.REF; } // not a reference
     if (col === undefined) {
       if (tgt.rows === 1 && tgt.cols > 1) { col = row; row = 0; } else col = 0;
     }
