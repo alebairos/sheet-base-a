@@ -878,7 +878,14 @@
         case 'paren': return this.ev(node.a, ctx);
         case 'at': {
           const v = this.ev(node.a, ctx);
-          if (v instanceof Range) return this.intersect(v, ctx);
+          if (v instanceof Range) {
+            // the cell in the formula's row/column; a range it cannot be
+            // intersected with is passed on whole (SUM(@A1:A3) below row 3)
+            if (v.rows === 1 && v.cols === 1) return v;
+            if (v.cols === 1 && ctx && ctx.r >= v.r1 && ctx.r <= v.r2) return new Range(v.sheet, ctx.r, v.c1, ctx.r, v.c1);
+            if (v.rows === 1 && ctx && ctx.c >= v.c1 && ctx.c <= v.c2) return new Range(v.sheet, v.r1, ctx.c, v.r1, ctx.c);
+            return v;
+          }
           if (v instanceof Matrix) return v.data[0][0];
           if (v instanceof RefList) return E.VALUE;
           return v;

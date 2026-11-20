@@ -6,7 +6,10 @@ same list can be fed to the LibreOffice oracle and to the engine.
 Lines starting with '#' are comments.
 Usage: tools/formulas2cases.py list.txt > tests/cases/name.json
 """
-import json, sys
+import json, os, sys
+
+# FORMULA_CELL=D5 puts the formula elsewhere (implicit intersection)
+TARGET = os.environ.get("FORMULA_CELL", "C1")
 
 DATA = {"A1": 1, "A2": 2, "A3": 3, "A4": "text", "A5": True, "A7": "5", "A8": -1.5,
         "A9": 0, "A10": "Apple", "A11": "banana", "A12": "=1/0",
@@ -20,7 +23,7 @@ for line in open(sys.argv[1], encoding="utf-8"):
     if not f.strip() or f.startswith("# "):
         continue
     d = dict(DATA)
-    d["C1"] = f if f.startswith("=") else "=" + f
+    d[TARGET] = f if f.startswith("=") else "=" + f
     cases[f] = {"sheets": {"Sheet1": d, "Sheet2": dict(SHEET2)}}
 json.dump(cases, sys.stdout, indent=1, ensure_ascii=False)
 print()
