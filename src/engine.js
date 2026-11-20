@@ -2128,6 +2128,22 @@
     if (isErr(v)) return v;
     return v instanceof Range || v instanceof Matrix ? v.cols : E.VALUE;
   });
+  // OFFSET(ref, rows, cols, [height], [width]): a reference moved and resized
+  def('OFFSET', 3, 5, function (nodes, ctx) {
+    const ref = this.ev(nodes[0], ctx);
+    const a = this.args(nodes.slice(1), ctx, ['n', 'n', 'n', 'n']);
+    if (isErr(ref)) return ref;
+    if (isErr(a)) return a;
+    if (!(ref instanceof Range)) return E.VALUE;
+    const dr = Math.trunc(a[0]), dc = Math.trunc(a[1]);
+    let h = a[2] === undefined ? ref.rows : Math.trunc(a[2]);
+    let w = a[3] === undefined ? ref.cols : Math.trunc(a[3]);
+    // a size below 1 or a result outside the sheet is an invalid argument
+    if (h < 1 || w < 1) return E.VALUE;
+    const r1 = ref.r1 + dr, c1 = ref.c1 + dc, r2 = r1 + h - 1, c2 = c1 + w - 1;
+    if (r1 < 0 || c1 < 0 || r2 >= MAXROW || c2 >= MAXCOL) return E.VALUE;
+    return new Range(ref.sheet, r1, c1, r2, c2);
+  });
   // functions that reset Calc's pending error (nGlobalError) when they finish
   const CLEARS_ERROR = new Set(['IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISERR', 'ISNA', 'ISLOGICAL',
     'ISNONTEXT', 'COUNT', 'COUNTA', 'N']);
