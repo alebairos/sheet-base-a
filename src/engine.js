@@ -1679,20 +1679,20 @@
   def('LEFT', 1, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n'], [undefined, 1]); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
-    if (n < 0) return E.VALUE;
+    if (a[1] < 0) return E.VALUE; // checked before truncation
     return codePoints(a[0]).slice(0, n).join('');
   });
   def('RIGHT', 1, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n'], [undefined, 1]); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
-    if (n < 0) return E.VALUE;
+    if (a[1] < 0) return E.VALUE;
     const cps = codePoints(a[0]);
     return n === 0 ? '' : cps.slice(Math.max(0, cps.length - n)).join('');
   });
   def('MID', 3, 3, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n', 'n']); if (isErr(a)) return a;
     const st = Math.trunc(a[1]), n = Math.trunc(a[2]);
-    if (st < 1 || n < 0) return E.VALUE;
+    if (st < 1 || a[2] < 0) return E.VALUE;
     return codePoints(a[0]).slice(st - 1, st - 1 + n).join('');
   });
   def('LEN', 1, 1, function (nodes, ctx) {
@@ -1879,7 +1879,7 @@
   def('REPT', 2, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n']); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
-    if (n < 0 || a[0].length * n > 32767) return E.VALUE;
+    if (a[1] < 0 || a[0].length * n > 32767) return E.VALUE;
     return a[0].repeat(n);
   });
   def('SUBSTITUTE', 3, 4, function (nodes, ctx) {
