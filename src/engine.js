@@ -1331,14 +1331,21 @@
         else if (nums.length > n0 && !(v instanceof Range)) parts.push(nums[n0]);
       }
       if (!opts.forward) nums.reverse();
-      // MIN/MAX take the number format of the first value of the first
-      // parameter: a boolean cell there makes the result a boolean.
+      // MIN/MAX take the number format of the first number met in parameter
+      // order (text and blank cells skipped): a boolean cell makes the result
+      // a boolean, a computed or constant value a number.
       let boolFmt = false;
-      if (vals.length && vals[0] instanceof Range) {
-        this.eachCell(vals[0], (x) => {
-          if (typeof x === 'number' || typeof x === 'boolean') { boolFmt = typeof x === 'boolean'; return false; }
+      for (const v of vals) {
+        if (!(v instanceof Range)) {
+          if (typeof v === 'number' || typeof v === 'boolean' || v instanceof Matrix) break;
+          continue;
+        }
+        let found = false;
+        this.eachCell(v, (x) => {
+          if (typeof x === 'number' || typeof x === 'boolean') { boolFmt = typeof x === 'boolean'; found = true; return false; }
           return true;
         });
+        if (found) break;
       }
       return { nums, parts, boolFmt: boolFmt && nums.length > 0 };
     }
