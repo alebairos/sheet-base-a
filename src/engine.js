@@ -1681,8 +1681,20 @@
           };
           const anyMat = raws.some((v) => one1(v) instanceof Matrix);
           const args = raws.map((v) => {
-            if (v instanceof Range) v = (!sc || (anyMat && name !== 'POWER')) && (v.rows > 1 || v.cols > 1) ? (name === 'NOT' ? this.rangeMatrix(v) : this.trimMatrix(v, ctx, name)) : this.intersect(v, ctx);
-            else v = one1(v);
+            if (v instanceof Range) {
+              const rg = v;
+              v = (!sc || (anyMat && name !== 'POWER')) && (v.rows > 1 || v.cols > 1) ? (name === 'NOT' ? this.rangeMatrix(v) : this.trimMatrix(v, ctx, name)) : this.intersect(v, ctx);
+              // (ISBLANK: a formula cell with an empty result is not blank)
+              if (name === 'ISBLANK' && v instanceof Matrix && v.data.some((row) => row.includes(null))) {
+                const m = new Matrix(v.data.map((row, r) => row.map((x, c) => {
+                  if (x !== null) return x;
+                  const cell = rg.sheet.cells.get((rg.r1 + r) * MAXCOL + rg.c1 + c);
+                  return cell && cell.ast ? '' : x;
+                })));
+                for (const k of Object.keys(v)) if (k !== 'data' && k !== 'rows' && k !== 'cols') m[k] = v[k];
+                v = m;
+              }
+            } else v = one1(v);
             return this.notePend(v);
           });
           if (!args.some((m) => m instanceof Matrix)) {
