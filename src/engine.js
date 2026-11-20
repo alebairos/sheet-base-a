@@ -54,6 +54,33 @@
     if (!ELIT[code]) { ELIT[code] = new FErr(code, true); ELIT[code].tok = true; ELIT[code].lit = true; }
     return ELIT[code];
   };
+  // a computed error kept as a token on Calc's stack (see Engine.ev0)
+  // (like an error constant, but a matrix-scalar power still reports it)
+  const ECONT = {};
+  const tokOf = (v) => {
+    if (!ECONT[v.code]) { const e = ECONT[v.code] = new FErr(v.code, true); e.tok = true; e.lit = true; e.cont = true; }
+    return ECONT[v.code];
+  };
+  // the error functions in a formula (Calc's IsErrFunc), marked and counted once
+  const countErrFuncs = (ast) => {
+    if (!ast || typeof ast !== 'object') return 0;
+    if (ast.efCount !== undefined) return ast.efCount;
+    let n = 0;
+    const walk = (x) => {
+      if (!x || typeof x !== 'object') return;
+      if (Array.isArray(x)) { for (const y of x) walk(y); return; }
+      if (x.t === 'fn' && ERR_FUNCS.has(x.name)) {
+        x.ef = true; n++;
+        if (x.args) Object.defineProperty(x.args, 'ef', { value: x, enumerable: false, configurable: true });
+      }
+      for (const k in x) if (k !== 'ef' && k !== 'efCount') walk(x[k]);
+    };
+    walk(ast);
+    Object.defineProperty(ast, 'efCount', { value: n, enumerable: false });
+    return n;
+  };
+  const ERR_FUNCS = new Set(['IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISERR', 'ISNA', 'ISLOGICAL',
+    'ISNONTEXT', 'ISREF', 'COUNT', 'COUNTA', 'N']);
   const demote = (v) => {
     if (!isErr(v) || v.fromRef) return v;
     const code = v === E.LOOKNA || v.look ? '#VALUE!' : v.code;
@@ -810,10 +837,15 @@
         const ctx = { sheet: sh, r: cell.r, c: cell.c };
         const clr = this.clr, pend = this.pend; // each cell has its own pending error (own interpreter)
         const seen = this.errSeen, lce = this.lastChildErr;
+        const efTotal = this.efTotal, efDone = this.efDone, efSeen = this.efSeen;
+        this.efTotal = countErrFuncs(cell.ast); this.efDone = 0; this.efSeen = new Set();
+        const gerr = this.gerr, inElem = this.inElem; this.gerr = null; this.inElem = 0;
         this.pend = null;
         try {
           v = this.finalValue(this.ev(cell.ast, ctx), ctx);
           if (this.pend && this.pend.clr === this.clr) v = this.pend.err;
+          // (the interpreter went on past an error no function cleared: that error)
+          else if (this.gerr && this.gerr.clr === this.clr && !(isErr(v) && v.tok)) v = this.gerr.err;
         } catch (e) {
           if (e instanceof RangeError) v = E.VALUE; // stack overflow etc.
           else throw e;
@@ -821,6 +853,7 @@
         this.clr = clr;
         this.pend = pend;
         this.errSeen = seen; this.lastChildErr = lce;
+        this.efTotal = efTotal; this.efDone = efDone; this.efSeen = efSeen; this.gerr = gerr; this.inElem = inElem;
       }
       this.running.pop();
       // (a cell left with IFERROR's missing value: an error shown as #N/A, not ISNA)
@@ -1005,10 +1038,33 @@
     // sc: ranges are intersected with the formula cell (an ordinary formula
     // whose inline arrays still compute element by element)
     aev(node, ctx, sc) { return this.aevPost(this.aev1(node, ctx, sc), ctx, sc); }
+    // an error function of the formula has run (counted once: see countErrFuncs)
+    // an error met while the formula still has an error function to run:
+    // Calc's interpreter goes on with it set (see ev0); null otherwise
+    contErr(e) {
+      if (!(this.efDone < this.efTotal) || e === UNKNOWN_FN || this.inElem) return null;
+      if (!this.gerr || this.gerr.clr !== this.clr) this.gerr = { err: asComputed(e), clr: this.clr };
+      return e === E.LOOKNA || e.look ? demote(e) : tokOf(e);
+    }
+    // a conversion error once Calc's error is set gives that error
+    convErr(e) { return this.gerr && this.gerr.clr === this.clr ? tokOf(this.gerr.err) : e; }
+    efRan(node) {
+      if (this.efSeen && !this.efSeen.has(node)) { this.efSeen.add(node); this.efDone++; }
+    }
+    aev1(node, ctx, sc) {
+      const r = this.aev1x(node, ctx, sc);
+      if (node.ef) this.efRan(node);
+      return r;
+    }
     aevPost(v, ctx, sc) {
       if (v instanceof Range) v = sc ? this.intersect(v, ctx) : this.rangeMatrix(v);
       // a scalar error met among array operations stays pending (Calc's
       // nGlobalError): it is the formula's result unless a reset follows
+      return this.notePend(v);
+    }
+    // a computed error stays pending, or is a token if Calc goes on past it (contErr)
+    notePend(v) {
+      if (isErr(v) && !v.fromRef && !v.tok) { const t = this.contErr(v); if (t) return t; }
       if (isErr(v) && !v.fromRef && !this.pend) this.pend = { err: v, clr: this.clr };
       return v;
     }
@@ -1023,7 +1079,7 @@
       }
       return new Matrix(rows);
     }
-    aev1(node, ctx, sc) {
+    aev1x(node, ctx, sc) {
       const lit = (x) => (x === MISSING ? { t: 'missing' } : { t: 'lit', v: x });
       // In an ordinary formula (sc) an array made by a function ("jm") reaches
       // another function's scalar parameter as its first element only, as in
@@ -1050,7 +1106,7 @@
           const op0 = node.op;
           if (sc && (op0 === '=' || op0 === '<>' || op0 === '<' || op0 === '>' || op0 === '<=' || op0 === '>=')) {
             // a comparison with an array takes a range operand as an array
-            const note = (v) => { if (isErr(v) && !v.fromRef && !this.pend) this.pend = { err: v, clr: this.clr }; return v; };
+            const note = (v) => this.notePend(v);
             const ra = note(this.aev1(node.a, ctx, sc)), rb = note(this.aev1(node.b, ctx, sc));
             const anyMat = ra instanceof Matrix || rb instanceof Matrix;
             const fix = (v) => (v instanceof Range ? (anyMat && (v.rows > 1 || v.cols > 1) ? this.rangeMatrix(v) : this.intersect(v, ctx)) : v);
@@ -1061,8 +1117,8 @@
           if (op === '^' && !(a instanceof Matrix && b instanceof Matrix)) {
             // Calc's matrix-scalar power: text and error elements are NaN to
             // pow(), so x^0 and 1^y are 1 and anything else is #NUM!
-            const pre = !node.fnPow && [a, b].find((v) => !(v instanceof Matrix) && isErr(v) && !v.fromRef);
-            if (pre) return pre;
+            const pre = !node.fnPow && [a, b].find((v) => !(v instanceof Matrix) && isErr(v) && (!v.fromRef || v.cont));
+            if (pre) return pre.cont ? errByCode(pre.code) : pre;
             const num = (v) => {
               if (v === null || v === undefined || v === EMPTYR || v === MISSING) return 0;
               const n = this.toNum(v);
@@ -1106,7 +1162,7 @@
             }));
             const args = [first];
             for (let k = 1; k < node.args.length; k++) {
-              const before = this.pend;
+              const before = this.pend, gBefore = this.gerr;
               // with an array condition a range branch is taken as an array
               this.lastChildErr = false;
               let b = node.args[k].t === 'missing' ? MISSING : this.aev1(node.args[k], ctx, sc);
@@ -1114,8 +1170,9 @@
               // a branch's error is only the element's, unless a computed
               // error went through a further operation in the branch
               if (isErr(b) && !b.fromRef && !this.pend && this.lastChildErr) this.pend = { err: b, clr: this.clr };
+              if (!(isErr(b) && this.lastChildErr)) this.gerr = gBefore;
               // a branch no element takes neither leaves a pending error nor sizes the result
-              if (name === 'IF' ? !used(k) : k === 1 && !used(1)) { this.pend = before; b = null; }
+              if (name === 'IF' ? !used(k) : k === 1 && !used(1)) { this.pend = before; this.gerr = gBefore; b = null; }
               // the condition's size holds where it is above 1; a branch only
               // extends the result along a dimension where the condition is 1
               if (b instanceof Matrix && ((first.rows > 1 && b.rows > first.rows) || (first.cols > 1 && b.cols > first.cols))) {
@@ -1191,8 +1248,7 @@
           const args = raws.map((v) => {
             if (v instanceof Range) v = (!sc || (anyMat && name !== 'POWER')) && (v.rows > 1 || v.cols > 1) ? this.rangeMatrix(v) : this.intersect(v, ctx);
             else v = one1(v);
-            if (isErr(v) && !v.fromRef && !this.pend) this.pend = { err: v, clr: this.clr };
-            return v;
+            return this.notePend(v);
           });
           if (!args.some((m) => m instanceof Matrix)) {
             if (collapsed) return asComputed(this.call({ t: 'fn', name, args: args.map(lit) }, ctx));
@@ -1249,7 +1305,9 @@
             for (let k = 0; k < xs.length; k++) if (xs[k] === OUT) xs[k] = AMISS;
           }
           this.amPos = [r, c];
-          row.push(f(...xs));
+          // (an element's error is the element's: not Calc's error, see contErr)
+          this.inElem = (this.inElem || 0) + 1;
+          try { row.push(f(...xs)); } finally { this.inElem--; }
         }
         out.push(row);
       }
@@ -1290,6 +1348,10 @@
       }
       this.lastChildErr = this.errSeen;
       this.errSeen = s || (isErr(r) && !r.fromRef);
+      // Calc's interpreter stops at an error unless the formula still has an
+      // error function (COUNT, IS..., N, IFERROR) to run; going on, the error
+      // is an ordinary token on the stack (MOD(SQRT(-1),0)+COUNT(1) is #DIV/0!)
+      if (isErr(r) && !r.fromRef && !r.tok) { const t = this.contErr(r); if (t) return t; }
       return r;
     }
     ev0x(node, ctx) {
@@ -1523,7 +1585,10 @@
       if (top) { top.fe = null; top.sup = (top.sup || 0) + 1; }
       let r;
       try { r = f.fn.call(this, node.args, ctx); } finally { if (top) top.sup--; }
-      if (CLEARS_ERROR.has(node.name)) this.clr++;
+      if (CLEARS_ERROR.has(node.name)) {
+        this.clr++;
+        if (node.ef && node.name !== 'IFERROR') this.efRan(node);
+      }
       return r;
     }
 
@@ -2313,9 +2378,12 @@
   // ---- logic
   def('IF', 1, 3, function (nodes, ctx) {
     const c = this.sv(nodes[0], ctx);
-    if (isErr(c)) return c.lit ? errByCode(c.code) : c; // (an error constant condition: now pending)
+    // an error condition: with an error function still to run, Calc passes
+    // the error on as a token and goes on (MOD(IF(NA(),1,COUNT(1)),0) is #DIV/0!)
+    if (isErr(c)) return this.contErr(c) || (c.lit ? errByCode(c.code) : c); // (an error constant condition: now pending)
     const b = this.toBool(c);
-    if (isErr(b)) return b;
+    // (a condition that does not convert: Calc passes on the error already set)
+    if (isErr(b)) return this.contErr(this.convErr(b)) || b;
     this.boolLost = false;
     if (b) {
       if (nodes.length < 2) return true;
@@ -2331,9 +2399,11 @@
     const v = this.ev(nodes[0], ctx);
     if (v instanceof RefList && !v.is3d) return v; // a reference list is not an error: passed on
     const s = this.scalar(v, ctx);
+    if (nodes.ef) this.efRan(nodes.ef); // (Calc runs IFERROR after its value, before the fallback)
     if (s === UNKNOWN_FN) return E.NOOP;
     if (isErr(s)) {
       this.boolLost = false;
+      this.gerr = null; // (Calc clears its error before the fallback)
       // the alternative is computed as an ordinary part of the formula
       const top = this.running && this.running[this.running.length - 1];
       if (top) { top.fe = null; top.sup--; }
