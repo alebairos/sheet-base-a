@@ -9,7 +9,10 @@ let n = 0;
 const t = (f) => { f(); n++; };
 
 t(() => assert.deepStrictEqual(parseCSV('a,1,TRUE\n"x,y",2.5,=B1+B2\n'),
-  { A1: 'a', B1: 1, C1: true, A2: 'x,y', B2: 2.5, C2: '=B1+B2' }));
+  { A1: 'a', B1: 1, C1: 'TRUE', A2: 'x,y', B2: 2.5, C2: '=B1+B2' }));
+// as LibreOffice's CSV import (checked with soffice --convert-to xlsx)
+t(() => assert.deepStrictEqual(parseCSV('"1,234","1,23","1234,567"," -1,234.5","0,001",1.000,FALSE\n'),
+  { A1: 1234, B1: '1,23', C1: 1234567, D1: -1234.5, E1: 1, F1: 1, G1: 'FALSE' }));
 t(() => assert.deepStrictEqual(parseCSV('"he said ""hi""",\n,3'), { A1: 'he said "hi"', B2: 3 }));
 t(() => assert.deepStrictEqual(parseCSV('1;2;3\n'), { A1: 1, B1: 2, C1: 3 }));
 t(() => assert.deepStrictEqual(parseCSV('"multi\nline",x\r\ny,z\r\n'), { A1: 'multi\nline', B1: 'x', A2: 'y', B2: 'z' }));

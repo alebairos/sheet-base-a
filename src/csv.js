@@ -54,10 +54,10 @@
   function typed(s) {
     if (s === '') return null;
     if (s.charAt(0) === '=' && s.length > 1) return s;
-    if (/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(s.trim())) return Number(s);
-    const u = s.toUpperCase();
-    if (u === 'TRUE') return true;
-    if (u === 'FALSE') return false;
+    // as LibreOffice's CSV import: numbers may group thousands with commas
+    // (groups after the first of three digits); TRUE/FALSE stay text
+    const t = s.trim();
+    if (/^[+-]?(\d+(,\d{3})*\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(t)) return Number(t.replace(/,/g, ''));
     return s;
   }
 
