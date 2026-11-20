@@ -266,7 +266,13 @@
     return y < 50 ? 2000 + y : 1900 + y;
   }
   function timeVal(t) {
-    let m = /^(\d+):(\d*)(?::(\d+(?:\.\d*)?))?(?:\s*([ap])\.?m\.?)?$/i.exec(t);
+    // (spaces around a ':' are separators too: "12: 30", "63: 0.00")
+    t = t.replace(/ *: */g, ':');
+    // (an hour with AM/PM alone: "10 AM")
+    let m = /^(\d+) *([ap])m$/i.exec(t);
+    if (m) return +m[1] > 12 ? null : ((+m[1] % 12) + (m[2].toLowerCase() === 'p' ? 12 : 0)) / 24;
+    // (a trailing ':' ends the time: "1:30:")
+    m = /^(\d+):(\d*)(?::(\d+(?:\.\d*)?)?)?(?:\s*([ap])m)?$/i.exec(t);
     if (m) {
       let h = +m[1];
       const mi = m[2] === '' ? 0 : +m[2], sec = m[3] ? +m[3] : 0;
@@ -337,7 +343,7 @@
     if (/[A-Za-z]{2}/.test(t)) {
       const md = monthDateVal(t);
       if (md !== null) return md;
-      const mt = /^(.*?) +(\d+:[\d:.]*(?: *[ap]\.?m\.?)?)$/i.exec(t);
+      const mt = /^(.*?) +(\d+:[\d:.]*(?: *[ap]m)?)$/i.exec(t);
       if (mt) {
         const d = monthDateVal(mt[1]), tm = timeVal(mt[2]);
         if (d !== null && tm !== null) return d + tm;
@@ -366,7 +372,7 @@
     }
     m = /^([+-]?) *(.*)$/.exec(t);
     if (/^[A-Za-z]{3}|^\d+-[A-Za-z]/.test(m[2])) return m[1] ? null : dateTimeVal(m[2]);
-    if (/[:/]|^\d+-\d/.test(m[2])) {
+    if (/[:/]|^\d+-\d|^\d+ *[ap]m$/i.test(m[2])) {
       const dv = dateTimeVal(m[2]);
       if (dv !== null) return m[1] === '-' ? -dv : dv;
       return null;
