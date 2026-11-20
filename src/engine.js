@@ -2590,9 +2590,11 @@
     let sum = rg;
     if (nodes.length > 2) {
       if (rg instanceof Matrix) {
-        // an inline array: elements beyond the sum array are skipped
-        if (!(s instanceof Matrix)) return E.VALUE;
-        return { rg, match, sum: s };
+        // an inline array: elements beyond the sum array are skipped; a
+        // reference sum range is taken from its top left cell at the
+        // array's size (SUMIF({1;2},2,B1) is B2)
+        if (s instanceof Matrix) return { rg, match, sum: s };
+        return { rg, match, sum: new Range(s.sheet, s.r1, s.c1, s.r1 + rg.rows - 1, s.c1 + rg.cols - 1) };
       }
       if (s instanceof Matrix) return { rg, match, sum: s };
       if (!(s instanceof Range)) return E.VALUE;
@@ -2606,7 +2608,9 @@
     if (a.rg instanceof Matrix) {
       a.rg.data.forEach((row, r) => row.forEach((v, c) => {
         if (err || !a.match(v)) return;
-        const sv = a.sum.data[r] ? a.sum.data[r][c] : undefined;
+        let sv = a.sum instanceof Matrix ? (a.sum.data[r] ? a.sum.data[r][c] : undefined)
+          : self.cellValue(a.sum.sheet, a.sum.r1 + r, a.sum.c1 + c);
+        if (sv === EMPTYR) sv = 0;
         if (typeof sv === 'number') nums.push(sv);
         else if (typeof sv === 'boolean') nums.push(sv ? 1 : 0);
         else if (isErr(sv)) err = sv;
@@ -3246,7 +3250,7 @@
     if (isErr(tbl) || (isErr(v) && v.lit)) return E.VALUE;
     const row = Math.trunc(rest[0]);
     const sorted = nodes.length > 3 && nodes[3].t === 'missing' ? false : rest[1];
-    if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
+    if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return E.VALUE;
     if (row < 1 || row > tbl.rows) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
     if (v === null) v = ''; else if (isLB(v) || v === EMPTYR || isMV(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
@@ -3278,7 +3282,7 @@
     if (isErr(tbl) || (isErr(v) && v.lit)) return E.VALUE;
     const col = Math.trunc(rest[0]);
     const sorted = nodes.length > 3 && nodes[3].t === 'missing' ? false : rest[1];
-    if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
+    if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return E.VALUE;
     if (col < 1 || col > tbl.cols) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
     if (v === null) v = ''; else if (isLB(v) || v === EMPTYR || isMV(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
@@ -3308,9 +3312,9 @@
     if (mode < -1 || mode > 1) return E.PARAM;
     // (a lookup array that is neither a reference nor an array: before a cell's error)
     if (!(rg instanceof Range) && !(rg instanceof Matrix) && !(rg instanceof RefList)) return E.VALUE;
+    if (!(rg instanceof RefList) && rg.rows !== 1 && rg.cols !== 1) return E.PARAM;
     if (isErr(v)) return v;
     if (rg instanceof RefList) return E.VALUE;
-    if (rg.rows !== 1 && rg.cols !== 1) return E.PARAM;
     if (v === null) v = ''; else if (isLB(v) || v === EMPTYR || isMV(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const list = this.firstLine(rg, rg.cols !== 1);
     const i = lookupPos(list, v, mode, rg instanceof Range ? (rg.cols === 1 ? 'col' : 'row') : null, true);
