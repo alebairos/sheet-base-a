@@ -1275,7 +1275,8 @@
               // with an array condition a range branch is taken as an array
               this.lastChildErr = false;
               if (skipK && skipK.has(k)) { args.push(E.NA); continue; }
-              let b = node.args[k].t === 'missing' ? MISSING : this.aev1(node.args[k], ctx, sc);
+              // (an empty branch is the number 0 element by element)
+              let b = node.args[k].t === 'missing' ? 0 : this.aev1(node.args[k], ctx, sc);
               // (a computed boolean in a branch some element takes gives the
               // whole result the boolean format; a cell's boolean does not)
               if (name !== 'IFERROR' && used(k) && node.args[k].t !== 'ref' && !(b instanceof Range) &&
@@ -1309,6 +1310,8 @@
                 if (!isErr(n) && !(pick >= 1 && pick < xs.length)) return E.IARG;
               } else pick = isErr(xs[0]) ? 1 : 0;
               if (pick && xs[pick] === AMISS) return E.NA;
+              // (an IF with only a condition gives the number 1 where it holds)
+              if (name === 'IF' && xs.length === 1 && pick === 1) return 1;
               xs = xs.map((x) => (x === AMISS ? null : x));
               let r = asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx));
               // (IFERROR's array loses the boolean format)
