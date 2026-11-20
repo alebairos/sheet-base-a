@@ -122,7 +122,10 @@
     let s = exp15(x); // 15 significant digits
     let [mant, exp] = s.split('e');
     let e = parseInt(exp, 10);
-    if (e <= -15 || e >= 15) {
+    // fixed or scientific follows the magnitude before rounding
+    // (999999999999999.9 is written 1000000000000000)
+    const eRaw = parseInt(x.toExponential().split('e')[1], 10);
+    if (eRaw <= -15 || eRaw >= 15) {
       mant = mant.indexOf('.') >= 0 ? mant.replace(/0+$/, '').replace(/\.$/, '') : mant;
       const sign = e < 0 ? '-' : '+';
       return mant + 'E' + sign + String(Math.abs(e)).padStart(3, '0');
