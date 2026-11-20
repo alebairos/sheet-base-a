@@ -1196,6 +1196,8 @@
         }
         case 'fn': {
           const name = node.name;
+          // (too many arguments: the call fails as a whole)
+          if (FUNCS[name] && FUNCS[name].max !== undefined && node.args.length > FUNCS[name].max) return this.call(node, ctx);
           if (name === 'IF' || name === 'IFERROR' || name === 'CHOOSE') {
             // a scalar condition/value picks a whole branch; an array one picks
             // element by element (IF without an else branch leaves the element empty;
@@ -1714,7 +1716,19 @@
       const n = node.args.length;
       // too few arguments: Err:511; too many: Err:508 for one-parameter functions, else Err:504
       if (n < f.min) return E.NOARG;
-      if (f.max !== undefined && n > f.max) return f.max === 1 ? E.PAREN : E.PARAM;
+      if (f.max !== undefined && n > f.max) {
+        if (f.max === 1) return E.PAREN; // (compile errors)
+        if (node.name === 'IF' || node.name === 'IFERROR') return E.PARAM;
+        // Err:504 when the function runs: its arguments are computed
+        // first, and a computed error among them stops the formula
+        // (references are not read)
+        for (const a of node.args) {
+          if (a.t === 'missing' || a.t === 'ref' || a.t === 'ref3d') continue;
+          const v = this.ev(a, ctx);
+          if (isErr(v) && !v.fromRef && !v.tok && v !== UNKNOWN_FN) return v;
+        }
+        return E.PARAM;
+      }
       // a function that resets the pending error (IFERROR's value, IS...,
       // COUNT, N) computes its arguments with no pending error (seen by a
       // cycle read): errors there are values on Calc's stack
