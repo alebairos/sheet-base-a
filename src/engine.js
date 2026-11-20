@@ -160,7 +160,8 @@
     const frac = m[2] || '';
     if (intp === '' && frac.length <= 1) return null;
     const v = Number((intp || '0') + (frac === '.' ? '' : frac) + (m[3] !== undefined ? 'e' + m[3] : ''));
-    return isFinite(v) ? { v, exp: m[3] !== undefined } : null;
+    // an exponent overflow reads as the largest number (whatever the sign, as Calc)
+    return isFinite(v) ? { v, exp: m[3] !== undefined } : { v: Number.MAX_VALUE, exp: true, overflow: true };
   }
   function daySerial(y, m, d) {
     if (m < 1 || m > 12 || d < 1) return null;
@@ -202,11 +203,55 @@
     if (m) return daySerial(fullYear(+m[1], m[1].length), +m[2], +m[3]);
     return null;
   }
+  // dates with an English month name, as Calc's en-US input accepts them:
+  // "Jan 1, 2024", "January 1 2024", "Sep. 5, 99", "Jan 2024", "Jan 31"
+  // (this year), "1-Jan-2024", "Jan/1/2024"
+  const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const FULL_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september',
+    'october', 'november', 'december'];
+  function monthIndex(w) {
+    w = w.toLowerCase().replace(/\.$/, '');
+    let i = MONTHS.indexOf(w);
+    if (i < 0) i = FULL_MONTHS.indexOf(w);
+    if (i < 0 && w === 'sept') i = 8;
+    return i < 0 ? null : i + 1;
+  }
+  function monthDateVal(t) {
+    let m = /^([A-Za-z]+\.?)(?: *([-/]) *| +)(\d{1,4})(?:(?: *, +| *,? +| *\/ *)(\d{1,4}))?$/.exec(t);
+    if (m) {
+      const mo = monthIndex(m[1]);
+      if (mo === null) return null;
+      if (m[2] === '-' && m[4] !== undefined) return null; // "Jan-1-2024"
+      if (m[4] !== undefined) {
+        if (m[3].length > 2) return null;
+        return daySerial(fullYear(+m[4], m[4].length), mo, +m[3]);
+      }
+      // one number: a day of this year, or a year
+      if (m[3].length <= 2 && +m[3] <= 31) return daySerial(new Date().getFullYear(), mo, +m[3]);
+      return daySerial(fullYear(+m[3], m[3].length), mo, 1);
+    }
+    m = /^(\d{1,2})-([A-Za-z]+\.?)-(\d{1,4})$/.exec(t);
+    if (m) {
+      const mo = monthIndex(m[2]);
+      return mo === null ? null : daySerial(fullYear(+m[3], m[3].length), mo, +m[1]);
+    }
+    return null;
+  }
   function dateTimeVal(t) {
     const tv = timeVal(t);
     if (tv !== null) return tv;
     const dv = dateVal(t);
     if (dv !== null) return dv;
+    if (/[A-Za-z]{2}/.test(t)) {
+      const md = monthDateVal(t);
+      if (md !== null) return md;
+      const mt = /^(.*?) +(\d+:[\d:.]*(?: *[ap]\.?m\.?)?)$/i.exec(t);
+      if (mt) {
+        const d = monthDateVal(mt[1]), tm = timeVal(mt[2]);
+        if (d !== null && tm !== null) return d + tm;
+      }
+      return null;
+    }
     const m = /^(\S+?)(?:\s+|T)(\S.*)$/.exec(t);
     if (m) {
       const d = dateVal(m[1]), tm = timeVal(m[2]);
@@ -228,6 +273,7 @@
       return m[1] === '-' ? -v : v;
     }
     m = /^([+-]?) *(.*)$/.exec(t);
+    if (/^[A-Za-z]{3}|^\d+-[A-Za-z]/.test(m[2])) return m[1] ? null : dateTimeVal(m[2]);
     if (/[:/]|^\d+-\d/.test(m[2])) {
       const dv = dateTimeVal(m[2]);
       if (dv !== null) return m[1] === '-' ? -dv : dv;
@@ -257,6 +303,7 @@
     const pn = plainNum(t);
     if (!pn) return null;
     let v = pn.v;
+    if (pn.overflow) return pct || cur ? null : v;
     if (pct && pn.exp) return null;
     if (pct) v /= 100;
     if (neg || lp) v = -v;
