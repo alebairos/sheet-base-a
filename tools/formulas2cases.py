@@ -15,6 +15,11 @@ DATA = {"A1": 1, "A2": 2, "A3": 3, "A4": "text", "A5": True, "A7": "5", "A8": -1
         "A9": 0, "A10": "Apple", "A11": "banana", "A12": "=1/0",
         "B1": 10, "B2": 20, "B3": 30, "B4": "x", "B5": False, "B6": "  padded  ", "B7": 2.5,
         "B8": "Banana", "B9": 100, "B10": "apple pie", "B11": "", "B12": 7}
+# DATASET=2: another data set (sorted numbers, duplicates, other errors)
+if os.environ.get("DATASET") == "2":
+    DATA = {"A1": -3, "A2": 0, "A3": 0.5, "A4": 2, "A5": 2, "A6": 7, "A7": "7", "A8": 15, "A9": "=NA()", "A10": "apple",
+            "A11": "Apple", "A12": "=SQRT(-4)", "B1": "b", "B2": "a", "B3": True, "B4": "", "B5": 3, "B6": "=A6*2",
+            "B7": "x y", "B8": " lead", "B9": -0.25, "B10": "=\"\"", "B11": 1E10, "B12": "zeta"}
 SHEET2 = {"A1": 10, "A2": 20, "A3": "two", "B1": "=A1*2"}
 
 cases = {}

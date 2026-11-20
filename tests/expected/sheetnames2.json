@@ -1,0 +1,122 @@
+{
+ "apos": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 6,
+    "A2": 7
+   },
+   "O'Brien": {
+    "A1": 3,
+    "A2": 4
+   }
+  }
+ },
+ "digits": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 11,
+    "A2": "x"
+   },
+   "2024": {
+    "A1": 10,
+    "B1": "x"
+   }
+  }
+ },
+ "dash": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "v",
+    "A2": 2
+   },
+   "my-data": {
+    "A1": "v",
+    "B2": 2
+   }
+  }
+ },
+ "unicode": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 10,
+    "A2": 6
+   },
+   "Données": {
+    "A1": 5
+   }
+  }
+ },
+ "underscore": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 8,
+    "A2": 9
+   },
+   "Data_1": {
+    "A1": 8
+   }
+  }
+ },
+ "spaces_range": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "y",
+    "A2": "z"
+   },
+   "Price List": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "B1": "x",
+    "B2": "y",
+    "B3": "z",
+    "C1": "a",
+    "C2": "b",
+    "C3": "c"
+   }
+  }
+ },
+ "missing_sheet": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#NAME?"
+    },
+    "A2": {
+     "error": "#NAME?"
+    },
+    "A3": "m",
+    "A4": true
+   }
+  }
+ },
+ "dollar_cross": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 6
+   },
+   "Sheet2": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3
+   }
+  }
+ },
+ "cross_range_ops": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 2,
+    "A2": 30,
+    "A3": 50
+   },
+   "Sheet2": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "B1": 10,
+    "B2": 20,
+    "B3": 30
+   }
+  }
+ }
+}

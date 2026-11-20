@@ -1,0 +1,118 @@
+{
+ "apos": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "='O''Brien'!A1*2",
+    "A2": "=SUM('O''Brien'!A1:A2)"
+   },
+   "O'Brien": {
+    "A1": 3,
+    "A2": 4
+   }
+  }
+ },
+ "digits": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "='2024'!A1+1",
+    "A2": "='2024'!B1"
+   },
+   "2024": {
+    "A1": 10,
+    "B1": "x"
+   }
+  }
+ },
+ "dash": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "='my-data'!A1",
+    "A2": "=COUNTA('my-data'!A1:B2)"
+   },
+   "my-data": {
+    "A1": "v",
+    "B2": 2
+   }
+  }
+ },
+ "unicode": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "='Données'!A1*2",
+    "A2": "=Données!A1+1"
+   },
+   "Données": {
+    "A1": 5
+   }
+  }
+ },
+ "underscore": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=Data_1!A1",
+    "A2": "=data_1!a1+1"
+   },
+   "Data_1": {
+    "A1": 8
+   }
+  }
+ },
+ "spaces_range": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=VLOOKUP(2,'Price List'!A1:B3,2,0)",
+    "A2": "=INDEX('Price List'!B1:B3,MATCH(\"c\",'Price List'!C1:C3,0))"
+   },
+   "Price List": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "B1": "x",
+    "B2": "y",
+    "B3": "z",
+    "C1": "a",
+    "C2": "b",
+    "C3": "c"
+   }
+  }
+ },
+ "missing_sheet": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=Nope!A1",
+    "A2": "='No Sheet'!A1+1",
+    "A3": "=IFERROR(Nope!A1,\"m\")",
+    "A4": "=ISERROR(Nope!A1)"
+   }
+  }
+ },
+ "dollar_cross": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=Sheet2!$A$1+Sheet2!A$2+Sheet2!$A3"
+   },
+   "Sheet2": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3
+   }
+  }
+ },
+ "cross_range_ops": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=SUM(Sheet2!A1:A3)/COUNT(Sheet2!A1:A3)",
+    "A2": "=MAX(Sheet2!A1:B3)",
+    "A3": "=SUMIF(Sheet2!A1:A3,\">1\",Sheet2!B1:B3)"
+   },
+   "Sheet2": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "B1": 10,
+    "B2": 20,
+    "B3": 30
+   }
+  }
+ }
+}

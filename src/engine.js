@@ -25,6 +25,9 @@
   const errText = (code) => (code[0] === '#' ? code : '#N/A');
   const isErr = (v) => v instanceof FErr;
   const asRefErr = (v) => (isErr(v) && !v.fromRef ? (EREF[v.code] || new FErr(v.code, true)) : v);
+  // an error whose pending state was cleared (IFERROR, ISNUMBER, ... ran
+  // later) is an ordinary operand; Calc's internal lookup error then reads as #VALUE!
+  const demote = (v) => (v === E.LOOKNA ? EREF['#VALUE!'] : asRefErr(v));
   const asComputed = (v) => (isErr(v) && v.fromRef ? errByCode(v.code) : v);
 
   // ---------------------------------------------------------------- helpers
@@ -604,6 +607,7 @@
   class Engine {
     constructor(json) {
       this.wb = new Workbook(json);
+      this.clr = 0; // count of pending-error resets (see CLEARS_ERROR)
     }
 
     // value of a cell (evaluating formulas), null for blank
@@ -624,12 +628,14 @@
       if (cell.parseError || !cell.ast) v = cell.parseError ? errByCode(cell.parseError) : null;
       else {
         const ctx = { sheet: sh, r: cell.r, c: cell.c };
+        const clr = this.clr; // each cell has its own pending error (own interpreter)
         try {
           v = this.finalValue(this.ev(cell.ast, ctx), ctx);
         } catch (e) {
           if (e instanceof RangeError) v = E.VALUE; // stack overflow etc.
           else throw e;
         }
+        this.clr = clr;
       }
       if (isErr(v)) v = asComputed(v);
       cell.value = v;
@@ -678,6 +684,13 @@
     }
 
     sv(node, ctx) { return this.scalar(this.ev(node, ctx), ctx); }
+    // scalar values of several arguments; an error computed before a later
+    // argument cleared the pending error becomes an ordinary operand
+    svAll(nodes, ctx) {
+      const vals = [], clrs = [];
+      for (const n of nodes) { vals.push(this.sv(n, ctx)); clrs.push(this.clr); }
+      return vals.map((v, i) => (clrs[i] !== this.clr ? demote(v) : v));
+    }
 
     // iterate a range column-major (as Calc does); fn(value, r, c) may return false to stop
     eachCell(rg, fn, includeBlank) {
@@ -1006,7 +1019,12 @@
 
     // ---- operators
     binop(node, ctx) {
-      const a = this.sv(node.a, ctx), b = this.sv(node.b, ctx);
+      let a = this.sv(node.a, ctx);
+      const clr = this.clr;
+      const b = this.sv(node.b, ctx);
+      // a function that clears Calc's pending error (IFERROR, ISNUMBER, ...)
+      // ran after the left operand: its error is then an ordinary operand
+      if (this.clr !== clr) a = demote(a);
       // errors produced by computation (left to right) win over
       // reference/conversion errors, which are checked right operand first.
       if (isErr(a) && !a.fromRef) return a;
@@ -1050,18 +1068,22 @@
       }
       const n = node.args.length;
       if (n < f.min || (f.max !== undefined && n > f.max)) return E.VALUE;
-      return f.fn.call(this, node.args, ctx);
+      const r = f.fn.call(this, node.args, ctx);
+      if (CLEARS_ERROR.has(node.name)) this.clr++;
+      return r;
     }
 
     // Evaluate fixed scalar arguments with Calc's error order:
     // computed errors left to right, then conversion right to left.
     // kinds: 'n' number, 's' string, 'b' bool, 'v' any scalar
     args(nodes, ctx, kinds, defaults) {
-      const vals = [];
+      const vals = [], clrs = [];
       for (let i = 0; i < kinds.length; i++) {
         if (i >= nodes.length) { vals.push(undefined); continue; }
         vals.push(this.sv(nodes[i], ctx));
+        clrs.push(this.clr);
       }
+      for (let i = 0; i < clrs.length; i++) if (clrs[i] !== this.clr) vals[i] = demote(vals[i]);
       for (const v of vals) if (isErr(v) && !v.fromRef) return v;
       const out = new Array(kinds.length);
       for (let i = kinds.length - 1; i >= 0; i--) {
@@ -1091,9 +1113,14 @@
     collect(nodes, ctx, opts) {
       const nums = [];
       const vals = [];
+      const evs = [];
       for (const node of nodes) {
-        if (node.t === 'missing') { vals.push(0); continue; } // an empty argument is 0
-        const v = this.ev(node, ctx);
+        if (node.t === 'missing') { evs.push([0, this.clr]); continue; } // an empty argument is 0
+        evs.push([this.ev(node, ctx), this.clr]);
+      }
+      // the first computed error wins, unless a later argument cleared it
+      for (let [v, clr] of evs) {
+        if (clr !== this.clr) v = demote(v);
         if (isErr(v) && !v.fromRef && !opts.skipErrors) return { err: v };
         if (v instanceof RefList) vals.push(...v.ranges); else vals.push(v);
       }
@@ -1579,7 +1606,7 @@
     return approxFloor(a[0]);
   });
   def('MOD', 2, 2, function (nodes, ctx) {
-    const vals = nodes.map((n) => this.sv(n, ctx));
+    const vals = this.svAll(nodes, ctx);
     for (const v of vals) if (isErr(v) && !v.fromRef) return v;
     const y = this.toNum(vals[1]); if (isErr(y)) return y;
     if (y === 0) return E.DIV0;
@@ -1825,7 +1852,7 @@
 
   // ---- text
   def('CONCATENATE', 0, undefined, function (nodes, ctx) {
-    const vals = nodes.map((n) => this.sv(n, ctx));
+    const vals = this.svAll(nodes, ctx);
     for (const v of vals) if (isErr(v) && !v.fromRef) return v;
     let s = '';
     for (const v of vals) {
@@ -1838,23 +1865,24 @@
   // Calc's LEN/LEFT/RIGHT/MID count Unicode code points, not UTF-16 units
   const codePoints = (s) => Array.from(s);
   const cpCount = (s) => codePoints(s).length;
+  const INT32 = 2147483647; // text positions and lengths are 32-bit in Calc
   def('LEFT', 1, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n'], [undefined, 1]); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
-    if (a[1] < 0) return E.VALUE; // checked before truncation
+    if (a[1] < 0 || n > INT32) return E.VALUE; // checked before truncation
     return codePoints(a[0]).slice(0, n).join('');
   });
   def('RIGHT', 1, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n'], [undefined, 1]); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
-    if (a[1] < 0) return E.VALUE;
+    if (a[1] < 0 || n > INT32) return E.VALUE;
     const cps = codePoints(a[0]);
     return n === 0 ? '' : cps.slice(Math.max(0, cps.length - n)).join('');
   });
   def('MID', 3, 3, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n', 'n']); if (isErr(a)) return a;
     const st = Math.trunc(a[1]), n = Math.trunc(a[2]);
-    if (st < 1 || a[2] < 0) return E.VALUE;
+    if (st < 1 || a[2] < 0 || st > INT32 || n > INT32) return E.VALUE;
     return codePoints(a[0]).slice(st - 1, st - 1 + n).join('');
   });
   def('LEN', 1, 1, function (nodes, ctx) {
@@ -2100,6 +2128,9 @@
     if (isErr(v)) return v;
     return v instanceof Range || v instanceof Matrix ? v.cols : E.VALUE;
   });
+  // functions that reset Calc's pending error (nGlobalError) when they finish
+  const CLEARS_ERROR = new Set(['IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISERR', 'ISNA', 'ISLOGICAL',
+    'ISNONTEXT', 'COUNT', 'COUNTA', 'N']);
   // parameters that take one value: an array there gives one result per element
   const MAPPED_PARAMS = { COUNTIF: [1], SUMIF: [1], AVERAGEIF: [1], VLOOKUP: [0], HLOOKUP: [0], MATCH: [0], INDEX: [1, 2] };
   const ELEMENTWISE = new Set(['IF', 'IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISNA', 'ISERR', 'ISLOGICAL',
@@ -2188,11 +2219,11 @@
     if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
     if (isErr(tbl)) return tbl;
     if (isErr(rest)) return rest;
-    if (isErr(v)) return v;
     const row = Math.trunc(rest[0]);
     const sorted = nodes.length > 3 && nodes[3].t === 'missing' ? false : rest[1];
-    if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return E.VALUE;
+    if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
     if (row < 1 || row > tbl.rows) return E.VALUE;
+    if (isErr(v)) return v; // an error read from a cell, after the index check
     if (v === null) return E.NA;
     const g = this.grid(tbl);
     const i = lookupPos(g[0], v, sorted ? 1 : 0, tbl instanceof Range ? 'row' : null);
@@ -2211,12 +2242,12 @@
     if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
     if (isErr(tbl)) return tbl;
     if (isErr(rest)) return rest;
-    if (isErr(v)) return v;
     const col = Math.trunc(rest[0]);
     const sorted = nodes.length > 3 && nodes[3].t === 'missing' ? false : rest[1];
-    if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return E.VALUE;
+    if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
     if (col < 1) return E.VALUE;
     if (col > tbl.cols) return E.VALUE;
+    if (isErr(v)) return v; // an error read from a cell, after the index check
     if (v === null) return E.NA;
     const g = this.grid(tbl);
     const first = g.map((row) => row[0]);
