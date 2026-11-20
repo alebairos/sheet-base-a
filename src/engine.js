@@ -1884,6 +1884,7 @@
   def('IFERROR', 2, 2, function (nodes, ctx) {
     if (nodes[0].t === 'missing') return E.NA;
     const v = this.ev(nodes[0], ctx);
+    if (v instanceof RefList) return v; // a reference list is not an error: passed on
     const s = this.scalar(v, ctx);
     if (s === UNKNOWN_FN) return E.NOOP;
     if (isErr(s)) { const alt = this.ev(nodes[1], ctx); return alt === MISSING ? 0 : alt; }
@@ -1947,7 +1948,9 @@
   });
   def('ISTEXT', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) === 'string'; });
   def('ISERROR', 1, 1, function (nodes, ctx) {
-    const v = this.sv(nodes[0], ctx);
+    const r = this.ev(nodes[0], ctx);
+    if (r instanceof RefList) return false;
+    const v = this.scalar(r, ctx);
     return v === UNKNOWN_FN ? E.NOOP : isErr(v);
   });
 
@@ -2041,7 +2044,12 @@
   });
 
   def('ISNA', 1, 1, function (nodes, ctx) { const v = this.sv(nodes[0], ctx); return isErr(v) && v.code === '#N/A'; });
-  def('ISERR', 1, 1, function (nodes, ctx) { const v = this.sv(nodes[0], ctx); return isErr(v) && v.code !== '#N/A'; });
+  def('ISERR', 1, 1, function (nodes, ctx) {
+    const r = this.ev(nodes[0], ctx);
+    if (r instanceof RefList) return false;
+    const v = this.scalar(r, ctx);
+    return isErr(v) && v.code !== '#N/A';
+  });
   def('ISLOGICAL', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) === 'boolean'; });
   def('ISNONTEXT', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) !== 'string'; });
   def('N', 1, 1, function (nodes, ctx) {
