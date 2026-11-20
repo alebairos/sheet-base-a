@@ -1540,7 +1540,10 @@
               const tv = this.ev(node.args[1], ctx);
               if (isErr(tv) && (tv.cont || (!tv.fromRef && !tv.tok && this.contErr(tv)))) return E.VALUE;
             }
-            return mark(this.amap(args, (...xs) => {
+            // (a reference result larger than the array so far grows the result,
+            // as Calc's jump matrix does: SUM(INDEX(A1:B3,2,{1;0})) is 2x2)
+            let gR = 0, gC = 0;
+            const elem = (...xs) => {
               const a2 = node.args.slice();
               // (an error element of a lookup value is an operand, not a pending
               // error: checked after the column/row index, as a cell's error)
@@ -1550,12 +1553,43 @@
               if (r instanceof Range) {
                 // a reference per element: its cell at the element's position
                 const rr = r.rows === 1 ? 0 : pos[0], cc = r.cols === 1 ? 0 : pos[1];
+                gR = Math.max(gR, r.rows); gC = Math.max(gC, r.cols);
                 if (rr >= r.rows || cc >= r.cols) return E.NA;
                 const x = this.cellValue(r.sheet, r.r1 + rr, r.c1 + cc);
                 return asComputed(x === EMPTYR ? '' : x);
               }
               return asComputed(r instanceof Matrix ? r.data[0][0] : r);
-            }));
+            };
+            let res = this.amap(args, elem, true);
+            // (Calc's jump matrix grows only along a dimension it has one
+            // element in, lcl_AdjustJumpMatrix; grown positions repeat the arguments)
+            const R0 = res.rows, C0 = res.cols;
+            const want = () => [R0 === 1 ? Math.max(gR, res.rows) : res.rows, C0 === 1 ? Math.max(gC, res.cols) : res.cols];
+            while (want()[0] > res.rows || want()[1] > res.cols) {
+              const [R, C] = want();
+              const out = [];
+              for (let r = 0; r < R; r++) {
+                const row = [];
+                for (let c = 0; c < C; c++) {
+                  if (r < R0 && c < C0) { row.push(res.data[r][c]); continue; }
+                  // (an argument shorter than the other dimension: empty there)
+                  let lack = false;
+                  const xs = args.map((m) => {
+                    if (!(m instanceof Matrix)) return m;
+                    const rr = m.rows === 1 ? 0 : r, cc = m.cols === 1 ? 0 : c;
+                    if (rr >= m.rows || cc >= m.cols) { lack = true; return null; }
+                    return m.epm && m.epm[rr][cc] ? EPATH : m.data[rr][cc];
+                  });
+                  if (lack) { row.push(null); continue; }
+                  this.amPos = [r, c];
+                  this.inElem = (this.inElem || 0) + 1;
+                  try { row.push(elem(...xs)); } finally { this.inElem--; }
+                }
+                out.push(row);
+              }
+              res = new Matrix(out);
+            }
+            return mark(res);
           }
           if (!ELEMENTWISE.has(name)) return mark(this.ev0(node, ctx));
           // (Calc's add-in functions take their arguments as in an ordinary
