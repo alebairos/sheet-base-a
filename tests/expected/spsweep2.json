@@ -1,0 +1,2962 @@
+{
+ "=SUMPRODUCT(A12,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,#DIV/0!)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,#DIV/0!)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,NA())": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,#N/A)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,NA())+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,#N/A)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,#NUM!)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,#NUM!)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,SQRT(-1))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,SQRT(-1))+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,#VALUE!)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,B1,#VALUE!)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,#DIV/0!)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,#DIV/0!)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,NA())": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,#N/A)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,NA())+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,#N/A)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,#NUM!)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,#NUM!)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,SQRT(-1))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,SQRT(-1))+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,#VALUE!)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(A12,#VALUE!)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(B1,#DIV/0!,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(B1,#DIV/0!,A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(B1,NA(),A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(B1,#N/A,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(B1,NA(),A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(B1,#N/A,A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(B1,#NUM!,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#NUM!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(B1,#NUM!,A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#NUM!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(B1,SQRT(-1),A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(B1,SQRT(-1),A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(B1,#VALUE!,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(B1,#VALUE!,A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#DIV/0!,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#DIV/0!,A12,B1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#DIV/0!,A12,B1)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#DIV/0!,A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#DIV/0!,#DIV/0!,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#DIV/0!,#DIV/0!,A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#DIV/0!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#N/A,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(NA(),A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#N/A,A12,B1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(NA(),A12,B1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#N/A,A12,B1)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(NA(),A12,B1)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#N/A,A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(NA(),A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#N/A,#N/A,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(NA(),NA(),A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#N/A,#N/A,A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(NA(),NA(),A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#N/A"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#NUM!,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#NUM!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#NUM!,A12,B1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#NUM!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#NUM!,A12,B1)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#NUM!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#NUM!,A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#NUM!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#NUM!,#NUM!,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#NUM!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#NUM!,#NUM!,A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#NUM!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(SQRT(-1),A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(SQRT(-1),A12,B1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(SQRT(-1),A12,B1)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(SQRT(-1),A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(SQRT(-1),SQRT(-1),A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(SQRT(-1),SQRT(-1),A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#VALUE!,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#VALUE!,A12,B1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#VALUE!,A12,B1)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#VALUE!,A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#VALUE!,#VALUE!,A12)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ },
+ "=SUMPRODUCT(#VALUE!,#VALUE!,A12)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": {
+     "error": "#DIV/0!"
+    },
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": 20
+   }
+  }
+ }
+}

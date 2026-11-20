@@ -3132,20 +3132,36 @@
     return new Matrix(d[0].map((_, c) => d.map((row) => nb(row[c]))));
   });
   def('SUMPRODUCT', 1, undefined, function (nodes, ctx) {
-    const grids = [];
+    const args = [];
     for (const n of nodes) {
-      if (n.t === 'missing') { grids.push([[0]]); continue; }
+      if (n.t === 'missing') { args.push({ g: [[0]] }); continue; }
       // (Calc's force-array parameter: functions inside take their
       // arguments as arrays too, SUMPRODUCT(MAX(A1:A3*B1:B3)))
       this.fa = (this.fa || 0) + 1;
       let v;
       try { v = this.aev(n, ctx); } finally { this.fa--; }
-      if (isErr(v)) return v;
       if (isMV(v)) return E.VALUE;
-      grids.push(v instanceof Matrix ? v.data : [[v]]);
+      if (isErr(v)) args.push({ err: v, cell: n.t === 'ref' && !n.b });
+      else args.push({ g: v instanceof Matrix ? v.data : [[v]] });
     }
+    // Calc pops the arguments last to first as matrices: a single cell's
+    // error sets its error if none is set (the element is 0); an error
+    // token sets it and moves it into a 1x1 element, clearing it; a size
+    // differing from the last argument's is that error, else #VALUE!; a
+    // set error is the result (SUMPRODUCT(A12,B1:B3) is A12's error,
+    // SUMPRODUCT(#N/A,B1:B3) is #VALUE!, SUMPRODUCT(#N/A,A12) is #N/A)
+    let gerr = null;
+    const grids = new Array(args.length);
+    for (let i = args.length - 1; i >= 0; i--) {
+      const a = args[i];
+      if (a.err && a.cell) { if (!gerr) gerr = a.err; grids[i] = [[0]]; }
+      else if (a.err) { gerr = null; grids[i] = [[a.err]]; }
+      else grids[i] = a.g;
+      const L = grids[args.length - 1];
+      if (grids[i].length !== L.length || grids[i][0].length !== L[0].length) return gerr || E.VALUE;
+    }
+    if (gerr) return gerr;
     const R = grids[0].length, C = grids[0][0].length;
-    if (grids.some((g) => g.length !== R || g[0].length !== C)) return E.VALUE;
     const prods = [];
     for (let c = 0; c < C; c++) for (let r = 0; r < R; r++) {
       // (Calc multiplies the arrays in turn: a text element makes the
