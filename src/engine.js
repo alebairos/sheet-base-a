@@ -1092,7 +1092,9 @@
           // an array too (not intersected), except for POWER (Calc's ^)
           const raws = node.args.map((n) => (n.t === 'missing' ? MISSING : this.aev1(n, ctx, sc)));
           // (NOT takes a function-made array whole: Calc's NOT handles arrays itself)
-          const one1 = (v) => (name === 'NOT' ? v : one(v));
+          // (beside an inline array, a function-made array is taken whole too)
+          const inl = raws.some((v) => v instanceof Matrix && !v.jm);
+          const one1 = (v) => (name === 'NOT' || inl ? v : one(v));
           const anyMat = raws.some((v) => one1(v) instanceof Matrix);
           const args = raws.map((v) => {
             if (v instanceof Range) v = (!sc || (anyMat && name !== 'POWER')) && (v.rows > 1 || v.cols > 1) ? this.rangeMatrix(v) : this.intersect(v, ctx);
