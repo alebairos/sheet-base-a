@@ -25,10 +25,11 @@
   // but text criteria (COUNTIF(A1,"Err:502")) see their own text
   for (const [k, code] of Object.entries({
     IARG: 'Err:502', PARAM: 'Err:504', PAREN: 'Err:508', NOOP: 'Err:509', NOVAR: 'Err:510', NOARG: 'Err:511',
-    CIRC: 'Err:522',
+    CIRC: 'Err:522', STROVF: 'Err:513',
   })) { E[k] = new FErr(code, false); EREF[code] = new FErr(code, true); }
   const errByCode = (code) => Object.values(E).find((e) => e.code === code) || new FErr(code);
-  const errText = (code) => (code[0] === '#' ? code : code === 'Err:LOOKNA' ? '#N/A' : '#VALUE!');
+  // (files show the lookup error and Err:513, string overflow, as #N/A)
+  const errText = (code) => (code[0] === '#' ? code : code === 'Err:LOOKNA' || code === 'Err:513' ? '#N/A' : '#VALUE!');
   const isErr = (v) => v instanceof FErr;
   const asRefErr = (v) => (isErr(v) && !v.fromRef ? (EREF[v.code] || new FErr(v.code, true)) : v);
   // an error whose pending state was cleared (IFERROR, ISNUMBER, ... ran
@@ -1985,6 +1986,7 @@
     const a = this.args(nodes, ctx, ['s', 'n', 'n'], undefined, [null, lenCheck, lenCheck]); if (isErr(a)) return a;
     const st = Math.trunc(a[1]), n = Math.trunc(a[2]);
     if (st < 1) return E.IARG;
+    if (st >= 2 ** 28 || n >= 2 ** 28) return E.STROVF; // beyond the longest string
     return codePoints(a[0]).slice(st - 1, st - 1 + n).join('');
   });
   def('LEN', 1, 1, function (nodes, ctx) {
@@ -2184,7 +2186,7 @@
     const a = this.args(nodes, ctx, ['s', 'n']); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
     if (a[1] < 0) return E.IARG;
-    if (a[0].length * n >= 2 ** 29) return E.NA; // Calc's string overflow reads back as #N/A
+    if (a[0].length * n >= 2 ** 28) return E.STROVF; // a string of 2^28 units or more
     return a[0].repeat(n);
   });
   def('SUBSTITUTE', 3, 4, function (nodes, ctx) {
