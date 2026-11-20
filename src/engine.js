@@ -75,7 +75,7 @@
   function fmtNum(x) {
     if (x === 0 || Object.is(x, -0)) return '0';
     if (!isFinite(x)) return '#NUM!';
-    if (Number.isInteger(x) && Math.abs(x) < 1e16) return String(x);
+    if (Number.isInteger(x) && Math.abs(x) < 9007199254740992) return String(x); // exact below 2^53
     let s = x.toExponential(14); // 15 significant digits
     let [mant, exp] = s.split('e');
     let e = parseInt(exp, 10);
@@ -940,9 +940,12 @@
       }
       // Calc pops parameters from the stack: the last one is examined first
       // (MEDIAN gathers its parameters into an array first: first one first)
+      const parts = []; // Calc's pop order: a number, or a range's numbers
       for (let j = 0; j < vals.length; j++) {
         const k = opts.forward ? j : vals.length - 1 - j;
         const v = vals[k];
+        const n0 = nums.length;
+        if (v instanceof Range || v instanceof Matrix) parts.push(nums); // placeholder, fixed below
         if (v instanceof Range) {
           let err = null;
           this.eachCell(v, (x) => {
@@ -960,6 +963,8 @@
           const n = textToNum(v);
           if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: E.VALUE };
         }
+        if (parts[parts.length - 1] === nums) parts[parts.length - 1] = nums.slice(n0);
+        else if (nums.length > n0) parts.push(nums[n0]);
       }
       if (!opts.forward) nums.reverse();
       // MIN/MAX take the number format of the first value of the first
@@ -971,7 +976,7 @@
           return true;
         });
       }
-      return { nums, boolFmt: boolFmt && nums.length > 0 };
+      return { nums, parts, boolFmt: boolFmt && nums.length > 0 };
     }
   }
 
@@ -1084,12 +1089,13 @@
   }
 
   // ---------------------------------------------------------------- lookup helpers
-  function lookupEq(v, x) {
+  // exact: an inline/computed array is searched with exact number equality
+  function lookupEq(v, x, exact) {
     if (x === null) return false;
     if (typeof v === 'boolean') v = v ? 1 : 0;
     if (typeof v === 'number') {
       if (typeof x === 'boolean') x = x ? 1 : 0;
-      return typeof x === 'number' && approxEqual(v, x);
+      return typeof x === 'number' && (exact ? v === x : approxEqual(v, x));
     }
     if (typeof v === 'string') {
       // text is compared with the cell's displayed text (numbers too)
@@ -1197,7 +1203,7 @@
   function lookupPos(list, v, mode, ranges) {
     if (typeof v === 'boolean') v = v ? 1 : 0;
     if (mode === 0 || (typeof v === 'string' && hasWild(v))) {
-      for (let i = 0; i < list.length; i++) if (lookupEq(v, list[i])) return i;
+      for (let i = 0; i < list.length; i++) if (lookupEq(v, list[i], !ranges)) return i;
       return -1;
     }
     if (ranges === 'col' || ranges === 'row') return sortedLookup(list, v, mode > 0, ranges === 'col');
@@ -1235,23 +1241,39 @@
     def(name, min === undefined ? 0 : min, undefined, function (nodes, ctx) {
       const r = this.collect(nodes, ctx, opts || {});
       if (r.err) return r.err;
-      return fn(r.nums, r.boolFmt);
+      return fn(r.nums, r.boolFmt, r.parts);
     });
   }
 
+  // LibreOffice's KahanSum (sc/inc/kahan.hxx): Neumaier summation that holds
+  // back the latest term and adds it last, snapping to 0 when it cancels.
+  const neumaier = (st, v) => {
+    const t = st.sum + v;
+    if (Math.abs(st.sum) >= Math.abs(v)) st.err += (st.sum - t) + v; else st.err += (v - t) + st.sum;
+    st.sum = t;
+  };
   const kahan = (nums) => {
-    let s = 0, comp = 0;
+    const st = { sum: 0, err: 0 };
+    let mem = 0;
     for (const x of nums) {
-      const t = s + x;
-      if (Math.abs(s) >= Math.abs(x)) comp += (s - t) + x; else comp += (x - t) + s;
-      s = t;
+      if (x === 0) continue;
+      if (mem === 0) { mem = x; continue; }
+      neumaier(st, mem);
+      mem = x;
     }
-    return approxAdd(s, comp);
+    const total = st.sum + st.err;
+    if (mem === 0) return total;
+    if (((mem < 0 && total > 0) || (total < 0 && mem > 0)) && approxEqual(mem, -total)) return 0;
+    neumaier(st, mem);
+    return st.sum + st.err;
   };
   const finite = (x) => (isFinite(x) ? x : E.NUM);
 
-  aggregate('SUM', (n) => finite(kahan(n)));
-  aggregate('AVERAGE', (n) => (n.length ? finite(kahan(n) / n.length) : E.DIV0));
+  // SUM/AVERAGE: parameters are popped last to first; a range is summed on
+  // its own (first cell first) and its total added as one term
+  const sumParts = (parts) => kahan(parts.map((p) => (Array.isArray(p) ? kahan(p) : p)));
+  aggregate('SUM', (n, b, parts) => finite(sumParts(parts)));
+  aggregate('AVERAGE', (n, b, parts) => (n.length ? finite(sumParts(parts) / n.length) : E.DIV0));
   const asFmt = (x, b) => (b && (x === 0 || x === 1) ? x === 1 : x);
   aggregate('MIN', (n, b) => (n.length ? asFmt(Math.min(...n), b) : 0), {}, 1);
   aggregate('MAX', (n, b) => (n.length ? asFmt(Math.max(...n), b) : 0), {}, 1);
@@ -1736,7 +1758,8 @@
       mant = mant / 10 ** exp;
       if (Number(mant.toFixed(decP.length)) >= 10 ** ip) { mant /= 10; exp++; }
     }
-    const scaled = Math.round(approxValue(mant * 10 ** decP.length));
+    const m10 = mant * 10 ** decP.length;
+    const scaled = Math.round(Number.isInteger(m10) && m10 < 9007199254740992 ? m10 : approxValue(m10));
     let str = decP.length ? (scaled / 10 ** decP.length).toFixed(decP.length) : String(scaled);
     if (!isFinite(scaled) || scaled > 1e21) str = mant.toFixed(decP.length);
     let [ip, dp = ''] = str.split('.');
@@ -2013,6 +2036,8 @@
     if (isErr(v)) return { error: errText(v.code) };
     if (typeof v === 'number') {
       if (!isFinite(v)) return { error: '#NUM!' };
+      // integers below 2^53 are written exactly, other numbers with 15 digits
+      if (Number.isInteger(v) && Math.abs(v) < 9007199254740992) return v === 0 ? 0 : v;
       const r = Number(v.toPrecision(15));
       return r === 0 ? 0 : r;
     }
