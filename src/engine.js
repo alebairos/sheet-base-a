@@ -48,8 +48,26 @@
     if (((a < 0 && b < 0) || (a > 0 && b > 0)) && approxEqual(a, b)) return 0;
     return a - b;
   }
+  // rtl::math::approxValue: round to 15 significant digits, except values
+  // above 2^41, integers and values with at most 11 fraction bits
+  const f64 = new DataView(new ArrayBuffer(8));
+  function fracBits(a) {
+    f64.setFloat64(0, a);
+    const hi = f64.getUint32(0), lo = f64.getUint32(4);
+    const e = ((hi >>> 20) & 0x7ff) - 1023;
+    if (e >= 52) return 0;
+    const fhi = hi & 0xfffff;
+    let tz; // trailing zeros of the 52-bit fraction
+    if (lo) tz = 31 - Math.clz32(lo & -lo);
+    else if (fhi) tz = 32 + 31 - Math.clz32(fhi & -fhi);
+    else tz = 52;
+    const least = fhi || lo ? tz + 1 : 53;
+    return Math.max(53 - least - e, 0);
+  }
   function approxValue(x) {
-    if (!isFinite(x) || x === 0) return x;
+    if (!isFinite(x) || x === 0 || x > 2199023255552) return x;
+    const a = Math.abs(x);
+    if ((Number.isInteger(a) && a < 9007199254740992) || fracBits(a) <= 11) return x;
     return Number(x.toPrecision(15));
   }
   const approxFloor = (x) => Math.floor(approxValue(x));
@@ -1363,7 +1381,14 @@
   });
   def('ROUNDUP', 1, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n', 'n'], [undefined, 0]); if (isErr(a)) return a;
-    return roundTo(a[0], a[1], 1);
+    let x = a[0];
+    // with a digits argument, Calc first rounds a positive non-integer to 12
+    // significant digits (tdf#124286)
+    if (nodes.length > 1 && x > 0 && Math.trunc(a[1]) < 12 && x % 1 !== 0) {
+      const t = Math.floor(approxValue(Math.log10(x))) + 1 - 12;
+      x = Math.round(Math.pow(10, -t) * x) * Math.pow(10, t);
+    }
+    return roundTo(x, a[1], 1);
   });
   def('ROUNDDOWN', 1, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n', 'n'], [undefined, 0]); if (isErr(a)) return a;
