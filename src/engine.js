@@ -89,25 +89,118 @@
     return out;
   }
 
-  // Text -> number, as Calc's unambiguous conversion (en-US).
-  const NUMRE = /^([+-]?)(\$?)([+-]?)(\d{1,3}(?:,\d{3})+|\d*)(\.\d*)?(?:[eE]([+-]?\d+))?(%?)$/;
+  // Text -> number, as Calc's number scanner (en-US): plain numbers with
+  // thousands separators, exponents, %, $, signs (leading, trailing or as
+  // parentheses), times (h:mm[:ss], am/pm), dates (m/d/y, y-m-d, y/m/d) and
+  // mixed fractions ("1 1/2").
+  const NUMRE = /^(\d{1,3}(?:,\d{3})+|\d*)(\.\d*)?(?:[eE]([+-]?\d+))?$/;
+  function plainNum(t) {
+    const m = NUMRE.exec(t);
+    if (!m) return null;
+    const intp = m[1].replace(/,/g, '');
+    const frac = m[2] || '';
+    if (intp === '' && frac.length <= 1) return null;
+    const v = Number((intp || '0') + (frac === '.' ? '' : frac) + (m[3] !== undefined ? 'e' + m[3] : ''));
+    return isFinite(v) ? { v, exp: m[3] !== undefined } : null;
+  }
+  function daySerial(y, m, d) {
+    if (m < 1 || m > 12 || d < 1) return null;
+    const dim = [31, (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];
+    if (d > dim) return null;
+    return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000);
+  }
+  function fullYear(y, len) {
+    if (len > 2) return y;
+    return y < 50 ? 2000 + y : 1900 + y;
+  }
+  function timeVal(t) {
+    let m = /^(\d+):(\d*)(?::(\d+(?:\.\d*)?))?(?:\s*([ap])\.?m\.?)?$/i.exec(t);
+    if (m) {
+      let h = +m[1];
+      const mi = m[2] === '' ? 0 : +m[2], sec = m[3] ? +m[3] : 0;
+      if (m[2] === '' && m[3] !== undefined) return null;
+      if (mi > 59 || sec >= 60) return null;
+      if (m[4]) {
+        if (h > 12) return null;
+        h = h % 12 + (m[4].toLowerCase() === 'p' ? 12 : 0);
+      }
+      return (h * 3600 + mi * 60 + sec) / 86400;
+    }
+    m = /^(\d+):(\d+\.\d*)$/.exec(t); // mm:ss.f
+    if (m) {
+      if (+m[2] >= 60) return null;
+      return (+m[1] * 60 + +m[2]) / 86400;
+    }
+    return null;
+  }
+  function dateVal(t) {
+    let m = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{1,4}))?$/.exec(t);
+    if (m) {
+      const y = m[3] !== undefined ? fullYear(+m[3], m[3].length) : new Date().getFullYear();
+      return daySerial(y, +m[1], +m[2]);
+    }
+    m = /^(\d{1,4})-(\d{1,2})-(\d{1,2})$/.exec(t);
+    if (m) return daySerial(fullYear(+m[1], m[1].length), +m[2], +m[3]);
+    return null;
+  }
+  function dateTimeVal(t) {
+    const tv = timeVal(t);
+    if (tv !== null) return tv;
+    const dv = dateVal(t);
+    if (dv !== null) return dv;
+    const m = /^(\S+?)(?:\s+|T)(\S.*)$/.exec(t);
+    if (m) {
+      const d = dateVal(m[1]), tm = timeVal(m[2]);
+      if (d !== null && tm !== null) return d + tm;
+    }
+    return null;
+  }
   function textToNum(s) {
-    const t = s.trim();
+    let t = s.replace(/^ +| +$/g, '');
     if (t === '') return null;
     const u = t.toUpperCase();
     if (u === 'TRUE') return 1;
     if (u === 'FALSE') return 0;
-    const m = NUMRE.exec(t);
-    if (!m) return null;
-    if (m[1] && m[3]) return null;
-    const intp = m[4].replace(/,/g, '');
-    const frac = m[5] || '';
-    if (intp === '' && frac.length <= 1) return null;
-    if (m[6] !== undefined && m[2]) return null;
-    let v = Number((intp || '0') + (frac === '.' ? '' : frac) + (m[6] !== undefined ? 'e' + m[6] : ''));
-    if (!isFinite(v)) return null;
-    if (m[7]) v /= 100;
-    if (m[1] === '-' || m[3] === '-') v = -v;
+    // mixed fraction: [sign] int num/den
+    let m = /^([+-]?)(\d+) +(\d+)\/(\d+)$/.exec(t);
+    if (m) {
+      if (+m[4] === 0) return null;
+      const v = +m[2] + +m[3] / +m[4];
+      return m[1] === '-' ? -v : v;
+    }
+    m = /^([+-]?) *(.*)$/.exec(t);
+    if (/[:/]|^\d+-\d/.test(m[2])) {
+      const dv = dateTimeVal(m[2]);
+      if (dv !== null) return m[1] === '-' ? -dv : dv;
+      return null;
+    }
+    let neg = false, signs = 0, cur = 0, pct = 0, lp = 0, rp = 0;
+    // peel leading and trailing decorations; % only as the outermost suffix
+    for (;;) {
+      t = t.replace(/^ +/, '');
+      const c = t[0];
+      if (c === '-' || c === '+') { signs++; if (c === '-') neg = true; t = t.slice(1); continue; }
+      if (c === '$') { cur++; t = t.slice(1); continue; }
+      if (c === '(') { lp++; t = t.slice(1); continue; }
+      break;
+    }
+    for (let first = true; ; first = false) {
+      t = t.replace(/ +$/, '');
+      const c = t[t.length - 1];
+      if (c === '%' && first) { pct++; t = t.slice(0, -1); continue; }
+      if (c === '-' || c === '+') { signs++; if (c === '-') neg = true; t = t.slice(0, -1); continue; }
+      if (c === '$') { cur++; t = t.slice(0, -1); continue; }
+      if (c === ')') { rp++; t = t.slice(0, -1); continue; }
+      break;
+    }
+    if (signs > 1 || cur > 1 || lp > 1 || lp !== rp || (cur && pct)) return null;
+    if (lp && signs) return null;
+    const pn = plainNum(t);
+    if (!pn) return null;
+    let v = pn.v;
+    if (pct && pn.exp) return null;
+    if (pct) v /= 100;
+    if (neg || lp) v = -v;
     return v;
   }
 
@@ -313,9 +406,14 @@
       for (;;) {
         if (isOp(',')) { list.push({ t: 'missing' }); p++; continue; }
         if (isOp(')')) { list.push({ t: 'missing' }); p++; return list; }
-        if (toks[p].t === 'eof') return list;
+        if (toks[p].t === 'eof') { if (list.length) throw new SyntaxError('unterminated argument list'); return list; }
         list.push(comparison());
-        if (isOp(',')) { p++; if (isOp(')')) { list.push({ t: 'missing' }); p++; return list; } continue; }
+        if (isOp(',')) {
+          p++;
+          if (isOp(')')) { list.push({ t: 'missing' }); p++; return list; }
+          if (toks[p].t === 'eof') throw new SyntaxError('unterminated argument list');
+          continue;
+        }
         expect(')');
         return list;
       }
