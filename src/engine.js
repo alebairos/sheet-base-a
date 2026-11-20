@@ -588,25 +588,34 @@
       }
     }
     function arrayConst() {
+      // Calc's inline arrays: numbers (one sign at most), text and TRUE/FALSE
+      // (stored as the numbers 1 and 0); an empty element is an empty matrix
+      // element, {} one such element; anything else (errors, expressions) is a
+      // syntax error shown as #N/A
+      const bad = () => fail('bad array constant', '#N/A');
       const rows = [[]];
       for (;;) {
-        let neg = false;
-        while (isOp('-') || isOp('+')) { if (toks[p].v === '-') neg = !neg; p++; }
-        const t = toks[p++];
+        let sign = 0;
+        if (isOp('-') || isOp('+')) { sign = toks[p].v === '-' ? -1 : 1; p++; }
+        const t = toks[p];
         let v;
-        if (t.t === 'num') v = neg ? -t.v : t.v;
-        else if (t.t === 'str' && !neg) v = t.v;
-        else if (t.t === 'err' && !neg) v = errByCode(t.v);
-        else if (t.t === 'name' && !neg && /^(TRUE|FALSE)$/i.test(t.v)) v = t.v.toUpperCase() === 'TRUE';
-        else throw new SyntaxError('bad array constant');
+        if (!sign && t.t === 'op' && (t.v === ',' || t.v === ';' || t.v === '}')) v = null;
+        else {
+          p++;
+          if (t.t === 'num') v = sign < 0 ? -t.v : t.v;
+          else if (t.t === 'str' && !sign) v = t.v;
+          else if (t.t === 'name' && !sign && /^(TRUE|FALSE)$/i.test(t.v) && !isOp('(')) v = t.v.toUpperCase() === 'TRUE' ? 1 : 0;
+          else bad();
+        }
         rows[rows.length - 1].push(v);
         if (isOp(',')) { p++; continue; }
         if (isOp(';')) { p++; rows.push([]); continue; }
-        expect('}');
+        if (!isOp('}')) bad();
+        p++;
         break;
       }
       const w = rows[0].length;
-      if (rows.some((r) => r.length !== w)) throw new SyntaxError('ragged array');
+      if (rows.some((r) => r.length !== w)) bad();
       return { t: 'arr', v: new Matrix(rows) };
     }
     function primary() {
@@ -1172,14 +1181,17 @@
         case 'neg': {
           let depth = 1, inner = node.a;
           while (inner.t === 'neg' || inner.t === 'paren') { if (inner.t === 'neg') depth++; inner = inner.a; }
+          this.boolLost = false;
           const raw = this.ev(inner, ctx);
+          const lost = this.boolLost;
           const v = this.scalar(raw, ctx);
           const n = this.toNum(v);
           if (isErr(n)) return asComputed(n);
           const r = depth % 2 ? -n : n;
           // Calc keeps the boolean number format through negation
-          // (but not for a cell reference, also one a function returns)
-          if (typeof v === 'boolean' && inner.t !== 'ref' && !(raw instanceof Range) && (r === 0 || r === 1)) return r === 1;
+          // (but not for a cell reference, also one a function returns, nor
+          // a value IFERROR passes on or INDEX takes from an inline array)
+          if (typeof v === 'boolean' && !lost && inner.t !== 'ref' && !(raw instanceof Range) && (r === 0 || r === 1)) return r === 1;
           return r === 0 ? 0 : r;
         }
         case 'pct': {
@@ -1188,8 +1200,13 @@
           if (isErr(n)) return asComputed(n);
           return n / 100;
         }
-        case 'bin': return asComputed(this.binop(node, ctx));
-        case 'fn': { const r = this.call(node, ctx); return r === UNKNOWN_FN ? r : asComputed(r); }
+        case 'bin': { const r = asComputed(this.binop(node, ctx)); this.boolLost = false; return r; }
+        case 'fn': {
+          const r = this.call(node, ctx);
+          // IF and CHOOSE pass on what their chosen argument left
+          if (!PASS_FMT.has(node.name)) this.boolLost = this.retLost;
+          this.retLost = false;
+          return r === UNKNOWN_FN ? r : asComputed(r); }
       }
       return E.VALUE;
     }
@@ -2023,6 +2040,7 @@
     if (isErr(c)) return c;
     const b = this.toBool(c);
     if (isErr(b)) return b;
+    this.boolLost = false;
     if (b) {
       if (nodes.length < 2) return true;
       const v = this.ev(nodes[1], ctx);
@@ -2038,7 +2056,14 @@
     if (v instanceof RefList) return v; // a reference list is not an error: passed on
     const s = this.scalar(v, ctx);
     if (s === UNKNOWN_FN) return E.NOOP;
-    if (isErr(s)) { const alt = this.ev(nodes[1], ctx); return alt === MISSING ? 0 : alt; }
+    if (isErr(s)) {
+      this.boolLost = false;
+      const alt = this.ev(nodes[1], ctx);
+      this.retLost = this.boolLost;
+      return alt === MISSING ? 0 : alt;
+    }
+    // Calc drops the boolean format of a value passed on (-IFERROR(FALSE,0) is 0)
+    this.retLost = true;
     return v === MISSING ? 0 : v;
   });
   function logical(name, init, combine) {
@@ -2384,6 +2409,7 @@
     const a = this.args(nodes.slice(0, 1), ctx, ['n']); if (isErr(a)) return a;
     const i = Math.trunc(a[0]);
     if (i < 1 || i >= nodes.length) return E.IARG;
+    this.boolLost = false;
     const v = this.ev(nodes[i], ctx);
     return v === MISSING ? 0 : v;
   });
@@ -2433,6 +2459,7 @@
     return new Range(ref.sheet, r1, c1, r2, c2);
   });
   // functions that reset Calc's pending error (nGlobalError) when they finish
+  const PASS_FMT = new Set(['IF', 'CHOOSE']);
   const CLEARS_ERROR = new Set(['IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISERR', 'ISNA', 'ISLOGICAL',
     'ISNONTEXT', 'ISREF', 'COUNT', 'COUNTA', 'N']);
   // parameters that take one value: an array there gives one result per element
@@ -2610,10 +2637,13 @@
     if (row < 0 || col < 0) return E.IARG;
     if (row > tgt.rows || col > tgt.cols) return E.REF;
     if (tgt instanceof Matrix) {
+      this.retLost = true;
+      // an empty element comes out as empty text
+      const el = (x) => (x === null ? '' : x);
       if (row === 0 && col === 0) return tgt;
-      if (row === 0) return new Matrix(tgt.data.map((r) => [r[col - 1]]));
-      if (col === 0) return new Matrix([tgt.data[row - 1]]);
-      return tgt.data[row - 1][col - 1];
+      if (row === 0) return new Matrix(tgt.data.map((r) => [el(r[col - 1])]));
+      if (col === 0) return new Matrix([tgt.data[row - 1].map(el)]);
+      return el(tgt.data[row - 1][col - 1]);
     }
     const r1 = row === 0 ? tgt.r1 : tgt.r1 + row - 1;
     const r2 = row === 0 ? tgt.r2 : r1;
