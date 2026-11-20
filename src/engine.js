@@ -244,7 +244,7 @@
   // thousands separators, exponents, %, $, signs (leading, trailing or as
   // parentheses), times (h:mm[:ss], am/pm), dates (m/d/y, y-m-d, y/m/d) and
   // mixed fractions ("1 1/2").
-  const NUMRE = /^(\d{1,3}(?:,\d{3})+|\d*)(\.\d*)?(?:[eE]([+-]?\d+))?$/;
+  const NUMRE = /^(\d+(?:,\d{3})+|\d*)(\.\d*)?(?:[eE]([+-]?\d+))?$/;
   function plainNum(t) {
     const m = NUMRE.exec(t);
     if (!m) return null;
@@ -268,16 +268,22 @@
   function timeVal(t) {
     // (spaces around a ':' are separators too: "12: 30", "63: 0.00")
     t = t.replace(/ *: */g, ':');
+    // (and so is a space between digits after one: "10:30 15")
+    if (/^\d+:/.test(t)) t = t.replace(/(\d) +(?=\d)/g, '$1:');
     // (an hour with AM/PM alone: "10 AM")
     let m = /^(\d+) *([ap])m$/i.exec(t);
     if (m) return +m[1] > 12 ? null : ((+m[1] % 12) + (m[2].toLowerCase() === 'p' ? 12 : 0)) / 24;
-    // (a trailing ':' ends the time: "1:30:")
+    // (a trailing ':' ends the time: "1:30:"; so does a trailing '.': "12:00.")
+    if (/^\d+:\d+\.$/.test(t)) t = t.slice(0, -1);
     m = /^(\d+):(\d*)(?::(\d+(?:\.\d*)?)?)?(?:\s*([ap])m)?$/i.exec(t);
     if (m) {
       let h = +m[1];
       const mi = m[2] === '' ? 0 : +m[2], sec = m[3] ? +m[3] : 0;
       if (m[2] === '' && m[3] !== undefined) return null;
-      if (mi > 59 || sec >= 60) return null;
+      // (minutes past 59 only after a zero hour: "0:301"; a longer field of zeros is no minute)
+      // (seconds past 59 only after a zero hour and minute: "0:0:75")
+      if ((mi > 59 && (h !== 0 || m[4])) || (sec >= 60 && (h !== 0 || mi !== 0 || m[4]))) return null;
+      if (m[2].length > 2 && mi === 0) return null;
       if (m[4]) {
         if (h > 12) return null;
         h = h % 12 + (m[4].toLowerCase() === 'p' ? 12 : 0);
@@ -286,7 +292,7 @@
     }
     m = /^(\d+):(\d+\.\d*)$/.exec(t); // mm:ss.f
     if (m) {
-      if (+m[2] >= 60) return null;
+      if (+m[2] >= 60 && +m[1] !== 0) return null; // (seconds past 59 only after zero minutes)
       return (+m[1] * 60 + +m[2]) / 86400;
     }
     return null;
@@ -373,6 +379,9 @@
     m = /^([+-]?) *(.*)$/.exec(t);
     if (/^[A-Za-z]{3}|^\d+-[A-Za-z]/.test(m[2])) return m[1] ? null : dateTimeVal(m[2]);
     if (/[:/]|^\d+-\d|^\d+ *[ap]m$/i.test(m[2])) {
+      // (a time may carry its sign at the end instead: "12:00-")
+      const ts = !m[1] && /^\d+ *:[^/]*\d *[+-]$/.exec(m[2]);
+      if (ts) { const tv = timeVal(m[2].slice(0, -1).replace(/ +$/, '')); return tv === null ? null : m[2].endsWith('-') ? -tv : tv; }
       const dv = dateTimeVal(m[2]);
       if (dv !== null) return m[1] === '-' ? -dv : dv;
       return null;
@@ -402,7 +411,7 @@
     if (!pn) return null;
     let v = pn.v;
     if (pn.overflow) return pct || cur ? null : v;
-    if (pct && pn.exp) return null;
+    if ((pct || cur) && pn.exp) return null;
     if (pct) v /= 100;
     if (neg || lp) v = -v;
     return v;
