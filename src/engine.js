@@ -559,6 +559,13 @@
       const rest = src.slice(j);
       if (sheet !== null || /^\$?[A-Za-z]/.test(rest) || /^\$?\d/.test(rest)) {
         let m = refRe.exec(rest);
+        // (a reference running into '!' is an unknown name: A1:A3!, Sheet1!A1!A2)
+        if (m && rest[m[0].length] === '!') {
+          const w = /^[\w.$!:\p{L}\p{N}\p{M}\u00B7]*/u.exec(rest.slice(m[0].length))[0];
+          toks.push({ t: 'name', v: src.slice(i, j + m[0].length) + w });
+          i = j + m[0].length + w.length;
+          continue;
+        }
         if (m && !/^[\w($\p{L}\p{N}\p{M}\u00B7]/u.test(rest.slice(m[0].length)) && !/^[.]/.test(rest.slice(m[0].length))) {
           const a = parseAddr(m[1]);
           const b = m[2] ? parseAddr(m[2]) : null;
@@ -1470,6 +1477,17 @@
               return LOOKUPS.has(name) ? v : one(v);
             });
             if (!args.some((m) => m instanceof Matrix)) return mark(this.ev0(node, ctx));
+            // (a computed error as the range or sum range of SUMIF/COUNTIF/
+            // AVERAGEIF is the formula's error, not each element's:
+            // SUMPRODUCT(SUMIF(1/0,A1:A3),{1;2}) is #DIV/0!)
+            if ((name === 'SUMIF' || name === 'COUNTIF' || name === 'AVERAGEIF') && !this.pend) {
+              for (const i of [0, 2]) {
+                const n = node.args[i];
+                if (!n || n.t === 'missing' || n.t === 'ref') continue;
+                const v = this.ev(n, ctx);
+                if (isErr(v) && !v.fromRef && !v.tok) { this.pend = { err: v, clr: this.clr }; break; }
+              }
+            }
             return mark(this.amap(args, (...xs) => {
               const a2 = node.args.slice();
               // (an error element of a lookup value is an operand, not a pending
@@ -1616,7 +1634,7 @@
     // last had such an error among its parts (it consumed a computed error)
     ev0(node, ctx) {
       const t = node.t;
-      if (t !== 'fn' && t !== 'bin' && t !== 'neg' && t !== 'pct') {
+      if (t !== 'fn' && t !== 'bin' && t !== 'neg' && t !== 'pct' && t !== 'rangeop' && t !== 'isect') {
         const r = this.ev0x(node, ctx);
         if (isErr(r) && !r.fromRef) this.errSeen = true;
         return r;
