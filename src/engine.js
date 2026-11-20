@@ -499,8 +499,9 @@
       let sheet = null, sheet2 = null;
       let j = i;
       {
-        const nm = "(?:'((?:[^']|'')+)'|([A-Za-z_\\p{L}\\p{N}\\p{M}][\\w.\\p{L}\\p{N}\\p{M}\u00B7]*))";
-        const m3 = new RegExp('^' + nm + ':' + nm + '!', 'u').exec(src.slice(i));
+        const nm = "(?:'((?:[^']|'')+)'|([A-Za-z_\\p{L}\\p{M}][\\w.\\p{L}\\p{N}\\p{M}\u00B7]*))";
+        // (the second sheet name may start with a digit: A1:2024!A1)
+        const m3 = new RegExp('^' + nm + ':' + nm.replace('[A-Za-z_', '[\\w') + '!', 'u').exec(src.slice(i));
         if (m3) {
           const un = (q, b) => (q !== undefined ? q.replace(/''/g, "'") : b);
           sheet = un(m3[1], m3[2]); sheet2 = un(m3[3], m3[4]);
@@ -520,7 +521,7 @@
         if (src[j] !== '!') throw new SyntaxError('expected !');
         sheet = s; j++;
       } else {
-        const m = /^([A-Za-z_\p{L}\p{N}\p{M}][\w.\p{L}\p{N}\p{M}\u00B7]*)!/u.exec(src.slice(i));
+        const m = /^([A-Za-z_\p{L}\p{M}][\w.\p{L}\p{N}\p{M}\u00B7]*)!/u.exec(src.slice(i));
         if (m) { sheet = m[1]; j = i + m[0].length; }
       }
       const rest = src.slice(j);
@@ -810,7 +811,7 @@
       this.sheets = [];
       this.byName = new Map();
       const sheets = (json && json.sheets) || {};
-      for (const name of Object.keys(sheets)) {
+      for (const name of sheets.__order || Object.keys(sheets)) {
         const sh = { name, cells: new Map(), maxR: -1, maxC: -1 };
         this.sheets.push(sh);
         this.byName.set(name.toUpperCase(), sh);
@@ -3457,6 +3458,43 @@
     return v;
   }
 
+  // JSON text -> value, like JSON.parse, but an object whose keys JavaScript
+  // would reorder (integer-like keys come first: a sheet named "2024") keeps
+  // the text's key order in a non-enumerable __order property, so sheets stay
+  // in workbook order for 3D references.
+  function parseJSONOrdered(text) {
+    const v = JSON.parse(text);
+    if (!/"\d+"\s*:/.test(text)) return v;
+    let i = 0;
+    const ws = () => { while (i < text.length && ' \t\n\r'.indexOf(text[i]) >= 0) i++; };
+    const str = () => { const st = i; i++; while (text[i] !== '"') i += text[i] === '\\' ? 2 : 1; i++; return JSON.parse(text.slice(st, i)); };
+    const val = (into) => {
+      ws();
+      const ch = text[i];
+      if (ch === '{') {
+        i++; const keys = []; ws();
+        if (text[i] === '}') { i++; return; }
+        for (;;) {
+          ws(); const k = str(); keys.push(k); ws(); i++; // ':'
+          val(into && typeof into[k] === 'object' && into[k] !== null ? into[k] : null);
+          ws(); if (text[i] === ',') { i++; continue; } i++; break;
+        }
+        if (into && keys.some((k, n) => Object.keys(into)[n] !== k)) Object.defineProperty(into, '__order', { value: keys });
+        return;
+      }
+      if (ch === '[') {
+        i++; ws(); let n = 0;
+        if (text[i] === ']') { i++; return; }
+        for (;;) { val(into ? into[n] : null); n++; ws(); if (text[i] === ',') { i++; continue; } i++; break; }
+        return;
+      }
+      if (ch === '"') { str(); return; }
+      while (i < text.length && ',]} \t\n\r'.indexOf(text[i]) < 0) i++;
+    };
+    val(v);
+    return v;
+  }
+
   function computeWorkbook(json) {
     const eng = new Engine(json);
     recalcAll(eng);
@@ -3634,7 +3672,7 @@
   }
 
   const api = {
-    computeWorkbook, recalcAll, parse, tokenize, fmtNum, textToNum, parseAddr, addrName, colName, colIndex, Engine, FUNCS,
+    computeWorkbook, parseJSONOrdered, recalcAll, parse, tokenize, fmtNum, textToNum, parseAddr, addrName, colName, colIndex, Engine, FUNCS,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SheetEngine = api;

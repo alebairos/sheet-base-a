@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Worker, isMainThread } = require('worker_threads');
-const { computeWorkbook } = require('../src/engine.js');
+const { computeWorkbook, parseJSONOrdered } = require('../src/engine.js');
 
 // run on a thread with the large stack bin/engine uses
 if (isMainThread) {
@@ -31,7 +31,7 @@ for (const f of fs.readdirSync(path.join(dir, 'cases')).sort()) {
   if (!f.endsWith('.json')) continue;
   const suite = f.slice(0, -5);
   if (only && suite !== only) continue;
-  const cases = JSON.parse(fs.readFileSync(path.join(dir, 'cases', f), 'utf8'));
+  const cases = parseJSONOrdered(fs.readFileSync(path.join(dir, 'cases', f), 'utf8'));
   const expFile = path.join(dir, 'expected', f);
   if (!fs.existsSync(expFile)) { console.error(`missing expected for ${suite}`); fail++; continue; }
   const expected = JSON.parse(fs.readFileSync(expFile, 'utf8'));

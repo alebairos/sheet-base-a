@@ -1,7 +1,13 @@
 /* Browser UI: grid, selection, editing, formula bar, open/save (CSV, JSON). */
 (function () {
   'use strict';
-  const { computeWorkbook, fmtNum, colName, parseAddr } = window.SheetEngine;
+  const { computeWorkbook, parseJSONOrdered, fmtNum, colName, parseAddr } = window.SheetEngine;
+  // sheet names in workbook order (JavaScript puts integer-like keys first)
+  const names = () => book.sheets.__order || Object.keys(book.sheets);
+  const withOrder = (sheets, order) => {
+    if (order.some((k, n) => Object.keys(sheets)[n] !== k)) Object.defineProperty(sheets, '__order', { value: order });
+    return sheets;
+  };
   const { parseCSV, toCSV, typed } = window.SheetCSV;
 
   const ERROR_TEXT = {
@@ -208,7 +214,7 @@
   function renderTabs() {
     const tabs = $('sheet-tabs');
     tabs.innerHTML = '';
-    for (const name of Object.keys(book.sheets)) {
+    for (const name of names()) {
       const b = document.createElement('button');
       b.textContent = name;
       if (name === current) b.className = 'active';
@@ -221,15 +227,18 @@
     const nn = prompt('Sheet name', name);
     if (!nn || nn === name || book.sheets[nn]) return;
     const sheets = {};
-    for (const [k, v] of Object.entries(book.sheets)) sheets[k === name ? nn : k] = v;
-    book.sheets = sheets;
+    const order = names().map((k) => (k === name ? nn : k));
+    for (const k of names()) sheets[k === name ? nn : k] = book.sheets[k];
+    book.sheets = withOrder(sheets, order);
     if (current === name) current = nn;
     recalc(); render();
   }
   $('btn-add-sheet').addEventListener('click', () => {
     let i = Object.keys(book.sheets).length + 1;
     while (book.sheets['Sheet' + i]) i++;
+    const order = names().concat('Sheet' + i);
     book.sheets['Sheet' + i] = {};
+    withOrder(book.sheets, order);
     current = 'Sheet' + i;
     sel = { r: 0, c: 0 };
     recalc(); render(); wrap.focus();
@@ -238,7 +247,7 @@
   // ---- open / save
   function load(newBook, sheet) {
     book = newBook;
-    current = sheet && book.sheets[sheet] ? sheet : Object.keys(book.sheets)[0];
+    current = sheet && book.sheets[sheet] ? sheet : names()[0];
     sel = { r: 0, c: 0 };
     recalc(); render(); wrap.focus();
   }
@@ -250,7 +259,7 @@
     const text = await f.text();
     try {
       if (/\.json$/i.test(f.name) || /^\s*\{/.test(text)) {
-        const data = JSON.parse(text);
+        const data = parseJSONOrdered(text);
         if (!data || typeof data.sheets !== 'object' || !Object.keys(data.sheets).length) throw new Error('no "sheets" object');
         load(data);
       } else {
@@ -270,7 +279,7 @@
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
   }
-  $('btn-save-json').addEventListener('click', () => download('workbook.json', JSON.stringify(book, null, 1) + '\n', 'application/json'));
+  $('btn-save-json').addEventListener('click', () => download('workbook.json', '{"sheets": {\n' + names().map((n) => JSON.stringify(n) + ': ' + JSON.stringify(book.sheets[n])).join(',\n') + '\n}}\n', 'application/json'));
   $('btn-save-csv').addEventListener('click', () => download(current + '.csv', toCSV(computed.sheets[current] || {}), 'text/csv'));
 
   window.__sheetDebug = () => ({ book, sel, current }); // used by the UI smoke test
