@@ -1210,7 +1210,7 @@
             if (sc && !this.fa && !(this.gerr && this.gerr.clr === this.clr)) {
               // (#VALUE! when the last element takes such a branch)
               const x0 = first.data[first.rows - 1][first.cols - 1];
-              let k0 = 0;
+              let k0 = -1; // (an error element takes no branch)
               if (name === 'IFERROR') k0 = 1; // (its value is no branch)
               else if (!isErr(x0) && typeof x0 !== 'string') {
                 if (name === 'IF') { const b = this.toBool(x0); k0 = isErr(b) ? 0 : b ? 1 : 2; } else { const n = this.toNum(x0); k0 = isErr(n) ? 0 : Math.trunc(n); }
@@ -1218,7 +1218,7 @@
               for (let k = 1; k < node.args.length; k++) {
                 const j = used(k) && this.jumpFirst(node.args[k], ctx);
                 if (isErr(j)) throw new JumpAbort(asComputed(j));
-                if (j) throw new JumpAbort(stackDepth(this.root, node) > 0 || k !== k0 ? E.NA : E.VALUE);
+                if (j) throw new JumpAbort(stackDepth(this.root, node) > 0 || (k0 >= 0 && k !== k0) ? E.NA : E.VALUE);
               }
             }
             for (let k = 1; k < node.args.length; k++) {
