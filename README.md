@@ -14,7 +14,7 @@ Requires Node.js (>= 18). No dependencies, no build step.
 
 ## Layout
 
-- `src/engine.js` — tokenizer, parser, evaluator and the functions (runs in Node and in the browser): the spec's 40, plus PI, COUNTBLANK, PROPER, EXACT, VALUE, FIND, SEARCH, ISNA, ISERR, ISLOGICAL, ISNONTEXT, N, T, SIGN, TRUNC, REPT, SUBSTITUTE, CHAR, CODE, CHOOSE, ROWS, COLUMNS, OFFSET, SUMPRODUCT, COUNTIFS, SUMIFS, AVERAGEIFS, HLOOKUP, EXP, LN, LOG, LOG10, FACT, ISODD, ISEVEN, EVEN, ODD, QUOTIENT, CEILING, FLOOR, VAR, VARP, STDEVP, LARGE, SMALL, RAND, RANDBETWEEN, TEXT (number formats, no dates or fractions), ROW, COLUMN. Unknown functions give `#NAME?` after their arguments are computed (a computed error argument wins), as in Calc.
+- `src/engine.js` — tokenizer, parser, evaluator and the functions (runs in Node and in the browser): the spec's 40, plus PI, COUNTBLANK, PROPER, EXACT, VALUE, FIND, SEARCH, ISNA, ISERR, ISLOGICAL, ISNONTEXT, N, T, SIGN, TRUNC, REPT, SUBSTITUTE, CHAR, CODE, CHOOSE, ROWS, COLUMNS, OFFSET, ISREF, SUMPRODUCT, COUNTIFS, SUMIFS, AVERAGEIFS, HLOOKUP, EXP, LN, LOG, LOG10, FACT, ISODD, ISEVEN, EVEN, ODD, QUOTIENT, CEILING, FLOOR, VAR, VARP, STDEVP, LARGE, SMALL, RAND, RANDBETWEEN, TEXT (number formats, no dates or fractions), ROW, COLUMN. Unknown functions give `#NAME?` after their arguments are computed (a computed error argument wins), as in Calc.
 - `bin/engine` — the CLI.
 - `src/csv.js` — CSV import/export; `ui/` — the browser UI.
 - `tests/src/*.txt` — formula lists; `tests/cases/*.json` the workbooks built from them; `tests/expected/*.json` LibreOffice's results.

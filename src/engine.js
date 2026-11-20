@@ -2130,6 +2130,10 @@
     return isErr(v) && v.code !== '#N/A';
   });
   def('ISLOGICAL', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) === 'boolean'; });
+  def('ISREF', 1, 1, function (nodes, ctx) {
+    const v = this.ev(nodes[0], ctx);
+    return v instanceof Range || v instanceof RefList;
+  });
   def('ISNONTEXT', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) !== 'string'; });
   def('N', 1, 1, function (nodes, ctx) {
     const v = this.sv(nodes[0], ctx);
@@ -2357,7 +2361,7 @@
   });
   // functions that reset Calc's pending error (nGlobalError) when they finish
   const CLEARS_ERROR = new Set(['IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISERR', 'ISNA', 'ISLOGICAL',
-    'ISNONTEXT', 'COUNT', 'COUNTA', 'N']);
+    'ISNONTEXT', 'ISREF', 'COUNT', 'COUNTA', 'N']);
   // parameters that take one value: an array there gives one result per element
   const MAPPED_PARAMS = { COUNTIF: [1], SUMIF: [1], AVERAGEIF: [1], VLOOKUP: [0], HLOOKUP: [0], MATCH: [0], INDEX: [1, 2] };
   const ELEMENTWISE = new Set(['IF', 'IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISNA', 'ISERR', 'ISLOGICAL',
