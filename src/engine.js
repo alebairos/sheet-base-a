@@ -1765,9 +1765,20 @@
             prevF = f; prevR = r;
             return blockErr;
           } : null;
+          // (SUM: Calc sums a run of number cells as one block, sumArray, and
+          // adds formula cells one by one; blank and text cells end a run)
+          let blk = null, blkR = -2;
+          const rid = {};
           this.eachCell(v, (x, r, c) => {
-            if (c !== col) { if (err && !opts.colCont) return false; col = c; cur = []; parts.push(cur); }
-            if (typeof x === 'number') { nums.push(x); cur.push(x); } else if (typeof x === 'boolean') { nums.push(x ? 1 : 0); cur.push(x ? 1 : 0); }
+            if (c !== col) { if (err && !opts.colCont) return false; col = c; cur = []; cur.segs = []; cur.rid = rid; parts.push(cur); blk = null; }
+            if (typeof x === 'number' || typeof x === 'boolean') {
+              const n = typeof x === 'boolean' ? (x ? 1 : 0) : x;
+              nums.push(n); cur.push(n);
+              const cell = v.sheet.cells.get(r * MAXCOL + c);
+              if (cell && (cell.formula || typeof cell.raw === 'boolean')) { cur.segs.push(n); blk = null; }
+              else { if (!blk || blkR !== r - 1) { blk = []; cur.segs.push(blk); } blk.push(n); blkR = r; }
+            } else blk = null;
+            if (typeof x === 'number' || typeof x === 'boolean') {}
             else if (isErr(x) && !opts.skipErrors) {
               // (a cell being computed, Err:522, does not end its column, but
               // no later column is computed)
@@ -2255,7 +2266,41 @@
   // SUM/AVERAGE: parameters are popped last to first; a range is summed on
   // its own (first cell first) and its total added as one term
   const popOrder = (parts) => [].concat(...parts.map((p) => (Array.isArray(p) ? p : [p])));
-  const sumParts = (parts) => kahan(parts.map((p) => (Array.isArray(p) ? sumArray(p) : p)));
+  // (a range's blocks and formula cells go to one Kahan sum, added to the
+  // total as its sum, error and held-back term)
+  const sumState = (xs) => {
+    const n = xs.length;
+    let i = 0;
+    const st = { sum: 0, err: 0, mem: 0 };
+    if (n > 7) {
+      const S = [];
+      for (let j = 0; j < 8; j++) S.push({ sum: 0, err: 0 });
+      for (; i + 7 < n; i += 8) for (let j = 0; j < 8; j++) neumaier(S[j], xs[i + j]);
+      const comb = (a, b) => {
+        for (let l = 0; l < 2; l++) { neumaier(S[a + l], S[b + l].sum); neumaier(S[a + l], S[b + l].err); }
+      };
+      comb(0, 2); comb(4, 6); comb(0, 4);
+      st.sum = S[0].sum; st.err = S[0].err;
+      neumaier(st, S[1].sum); neumaier(st, S[1].err);
+    }
+    for (; i < n; i++) kahanAdd(st, xs[i]);
+    return st;
+  };
+  const addState = (st, b) => { kahanAdd(st, b.sum); kahanAdd(st, b.err); kahanAdd(st, b.mem); };
+  const sumParts = (parts) => {
+    const T = { sum: 0, err: 0, mem: 0 };
+    let R = null, rid = null;
+    const flush = () => { if (R) addState(T, R); R = null; rid = null; };
+    for (const p of parts) {
+      if (Array.isArray(p) && p.segs) {
+        const C = { sum: 0, err: 0, mem: 0 };
+        for (const sg of p.segs) { if (Array.isArray(sg)) kahanAdd(C, kahanGet(sumState(sg))); else kahanAdd(C, sg); }
+        kahanAdd(T, kahanGet(C));
+      } else { flush(); if (Array.isArray(p)) kahanAdd(T, sumArray(p)); else kahanAdd(T, p); }
+    }
+    flush();
+    return kahanGet(T);
+  };
   // SUM scans a range column by column: the first column holding an error
   // reports the last error in that column (Calc's per-column sum)
   aggregate('SUM', (n, b, parts) => finite(sumParts(parts)), { colLastErr: true, kahanErr: true });
