@@ -632,6 +632,78 @@
       return [[v]];
     }
 
+    // ---- array evaluation (SUMPRODUCT's arguments): ranges become matrices,
+    // operators and scalar functions apply element by element
+    aev(node, ctx) {
+      const v = this.aev1(node, ctx);
+      return v instanceof Range ? this.rangeMatrix(v) : v;
+    }
+    rangeMatrix(v) {
+      const sh = v.sheet;
+      const r2 = Math.min(v.r2, Math.max(v.r1, sh.maxR + 1)), c2 = Math.min(v.c2, Math.max(v.c1, sh.maxC + 1));
+      const rows = [];
+      for (let r = v.r1; r <= r2; r++) {
+        const row = [];
+        for (let c = v.c1; c <= c2; c++) { const x = this.cellValue(sh, r, c); row.push(x === EMPTYR ? null : x); }
+        rows.push(row);
+      }
+      return new Matrix(rows);
+    }
+    aev1(node, ctx) {
+      const lit = (x) => (x === MISSING ? { t: 'missing' } : { t: 'lit', v: x });
+      switch (node.t) {
+        case 'paren': return this.aev(node.a, ctx);
+        case 'neg': case 'pct': {
+          const a = this.aev(node.a, ctx);
+          if (!(a instanceof Matrix)) return this.ev(node, ctx);
+          return this.amap([a], (x) => this.ev({ t: node.t, a: lit(x) }, ctx));
+        }
+        case 'bin': {
+          const a = this.aev(node.a, ctx), b = this.aev(node.b, ctx);
+          if (!(a instanceof Matrix) && !(b instanceof Matrix)) return asComputed(this.binop({ op: node.op, a: lit(a), b: lit(b) }, ctx));
+          return this.amap([a, b], (x, y) => asComputed(this.binop({ op: node.op, a: lit(x), b: lit(y) }, ctx)));
+        }
+        case 'fn': {
+          if (!ELEMENTWISE.has(node.name)) return this.ev(node, ctx);
+          const args = node.args.map((n) => (n.t === 'missing' ? MISSING : this.aev(n, ctx)));
+          if (!args.some((m) => m instanceof Matrix)) return this.ev(node, ctx);
+          return this.amap(args, (...xs) => asComputed(this.call({ t: 'fn', name: node.name, args: xs.map(lit) }, ctx)));
+        }
+        default: return this.ev(node, ctx);
+      }
+    }
+    // a "force array" parameter: references stay references, expressions
+    // are evaluated as arrays
+    fev(node, ctx) {
+      let n = node;
+      while (n.t === 'paren') n = n.a;
+      if (n.t === 'ref' || n.t === 'rangeop') return this.ev(n, ctx);
+      return this.aev(n, ctx);
+    }
+    // element-wise map; a single row/column is repeated, otherwise the
+    // result is as large as the smallest operand
+    amap(args, f) {
+      let R = Infinity, C = Infinity;
+      for (const m of args) if (m instanceof Matrix) { if (m.rows > 1) R = Math.min(R, m.rows); if (m.cols > 1) C = Math.min(C, m.cols); }
+      if (R === Infinity) R = 1;
+      if (C === Infinity) C = 1;
+      const at = (m, r, c) => {
+        if (!(m instanceof Matrix)) return m;
+        const rr = m.rows === 1 ? 0 : r, cc = m.cols === 1 ? 0 : c;
+        return rr < m.rows && cc < m.cols ? m.data[rr][cc] : E.NA;
+      };
+      const out = [];
+      for (let r = 0; r < R; r++) {
+        const row = [];
+        for (let c = 0; c < C; c++) {
+          const xs = args.map((m) => at(m, r, c));
+          row.push(f(...xs));
+        }
+        out.push(row);
+      }
+      return new Matrix(out);
+    }
+
     resolveSheet(name, ctx) {
       if (name === null || name === undefined) return ctx.sheet;
       return this.wb.sheet(name);
@@ -645,6 +717,7 @@
         case 'errlit': return node.v;
         case 'arr': return node.v;
         case 'missing': return MISSING;
+        case 'lit': return node.v;
         case 'paren': return this.ev(node.a, ctx);
         case 'name': return E.NAME;
         case 'ref': {
@@ -1677,12 +1750,17 @@
     if (isErr(v)) return v;
     return v instanceof Range || v instanceof Matrix ? v.cols : 1;
   });
+  const ELEMENTWISE = new Set(['IF', 'IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISNA', 'ISERR', 'ISLOGICAL',
+    'ISNONTEXT', 'LEN', 'ABS', 'ROUND', 'ROUNDUP', 'ROUNDDOWN', 'INT', 'TRUNC', 'SIGN', 'NOT', 'UPPER', 'LOWER', 'LEFT',
+    'RIGHT', 'MID', 'TRIM', 'VALUE', 'MOD', 'POWER', 'SQRT', 'EXACT', 'EXP', 'LN', 'SEARCH', 'FIND', 'SUBSTITUTE',
+    'PROPER', 'REPT', 'CODE', 'CHAR', 'ISODD', 'ISEVEN']);
   def('SUMPRODUCT', 1, undefined, function (nodes, ctx) {
     const grids = [];
     for (const n of nodes) {
-      const v = this.ev(n, ctx);
+      if (n.t === 'missing') return E.VALUE;
+      const v = this.aev(n, ctx);
       if (isErr(v)) return v;
-      grids.push(v instanceof Range ? this.grid(new Range(v.sheet, v.r1, v.c1, v.r2, v.c2)) : this.grid(v));
+      grids.push(v instanceof Matrix ? v.data : [[v]]);
     }
     const R = grids[0].length, C = grids[0][0].length;
     if (grids.some((g) => g.length !== R || g[0].length !== C)) return E.VALUE;
@@ -1753,7 +1831,7 @@
   });
   def('HLOOKUP', 3, 4, function (nodes, ctx) {
     const v = this.sv(nodes[0], ctx);
-    const tbl = this.ev(nodes[1], ctx);
+    const tbl = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
     if (isErr(v) && !v.fromRef) return v;
     if (isErr(tbl)) return tbl;
@@ -1776,7 +1854,7 @@
   // ---- lookup
   def('VLOOKUP', 3, 4, function (nodes, ctx) {
     const v = this.sv(nodes[0], ctx);
-    const tbl = this.ev(nodes[1], ctx);
+    const tbl = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
     if (isErr(v) && !v.fromRef) return v;
     if (isErr(tbl)) return tbl;
@@ -1799,7 +1877,7 @@
   });
   def('MATCH', 2, 3, function (nodes, ctx) {
     const v = this.sv(nodes[0], ctx);
-    const rg = this.ev(nodes[1], ctx);
+    const rg = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n'], [1]);
     if (isErr(v) && !v.fromRef) return v;
     if (isErr(rg)) return rg;
