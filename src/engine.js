@@ -25,11 +25,11 @@
   // but text criteria (COUNTIF(A1,"Err:502")) see their own text
   for (const [k, code] of Object.entries({
     IARG: 'Err:502', PARAM: 'Err:504', PAREN: 'Err:508', NOOP: 'Err:509', NOVAR: 'Err:510', NOARG: 'Err:511',
-    CIRC: 'Err:522', STROVF: 'Err:513',
+    CIRC: 'Err:522', STROVF: 'Err:513', OVF: 'Err:514', CODEOVF: 'Err:512',
   })) { E[k] = new FErr(code, false); EREF[code] = new FErr(code, true); }
   const errByCode = (code) => Object.values(E).find((e) => e.code === code) || new FErr(code);
   // (files show the lookup error and Err:513, string overflow, as #N/A)
-  const errText = (code) => (code[0] === '#' ? code : code === 'Err:LOOKNA' || code === 'Err:513' ? '#N/A' : '#VALUE!');
+  const errText = (code) => (code[0] === '#' ? code : code === 'Err:LOOKNA' || code === 'Err:512' || code === 'Err:513' || code === 'Err:514' ? '#N/A' : '#VALUE!');
   const isErr = (v) => v instanceof FErr;
   const asRefErr = (v) => (isErr(v) && !v.fromRef ? (EREF[v.code] || new FErr(v.code, true)) : v);
   // an error whose pending state was cleared (IFERROR, ISNUMBER, ... ran
@@ -665,6 +665,7 @@
       if (typeof raw === 'string' && raw.charAt(0) === '=' && raw.length > 1) {
         cell.formula = true;
         try { cell.ast = parse(raw.slice(1)); } catch (e) { cell.parseError = e.code || '#VALUE!'; }
+        if (cell.ast && raw.length > 196) { const e = compileLimits(raw.slice(1), cell.ast); if (e) { cell.ast = null; cell.parseError = e; } }
       } else if (raw !== null && typeof raw === 'object') {
         cell.value = raw.error ? errByCode(raw.error) : null;
         cell.state = 2;
@@ -2688,12 +2689,38 @@
     return out;
   }
 
+  // Calc's compiler limits: parentheses nest at most 98 deep (Err:514), a
+  // formula holds at most 8191 tokens and a
+  // function at most 255 parameters (Err:512); both show as #N/A.
+  function compileLimits(src, ast) {
+    let d = 0, max = 0, n = 0;
+    for (const t of tokenize(src)) {
+      if (t.t === 'eof') break;
+      n++;
+      if (t.t === 'op') { if (t.v === '(') max = Math.max(max, ++d); else if (t.v === ')') d--; }
+    }
+    if (max > 98) return 'Err:514';
+    if (n > 8191) return 'Err:512';
+    const todo = [ast];
+    while (todo.length) {
+      const node = todo.pop();
+      if (!node || typeof node !== 'object') continue;
+      if (node.args) { if (node.args.length > 255) return 'Err:512'; todo.push(...node.args); }
+      if (node.a && node.a.t) todo.push(node.a);
+      if (node.b && node.b.t) todo.push(node.b);
+    }
+    return null;
+  }
+
   // Formula cells a formula may read, from its references (an over-approximation).
   function staticPrecedents(eng, cell, rnodes) {
     const out = [];
     const seen = new Set();
     const add = (x) => { if (x && (x.formula || x.isRange) && !seen.has(x)) { seen.add(x); out.push(x); } };
-    const walk = (node) => {
+    // (an explicit stack: formulas can nest deeper than the call stack)
+    const todo = [];
+    const walk = (node) => { todo.push(node); };
+    const visit = (node) => {
       if (!node || typeof node !== 'object') return;
       if (node.t === 'ref3d') {
         const s1 = eng.wb.sheet(node.sheet), s2 = eng.wb.sheet(node.sheet2);
@@ -2727,6 +2754,7 @@
       if (node.args) node.args.forEach(walk);
     };
     walk(cell.ast);
+    while (todo.length) visit(todo.pop());
     return out;
   }
 

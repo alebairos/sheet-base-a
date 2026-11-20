@@ -1,0 +1,149 @@
+{
+ "terms4096": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 4096
+   }
+  }
+ },
+ "terms4097": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#N/A"
+    },
+    "B1": false,
+    "B2": true,
+    "B3": "e",
+    "B4": 1
+   }
+  }
+ },
+ "refs4096": {
+  "sheets": {
+   "Sheet1": {
+    "A2": 2,
+    "A1": {
+     "error": "#NUM!"
+    }
+   }
+  }
+ },
+ "concat": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 8000
+   }
+  }
+ },
+ "sum255": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 255
+   }
+  }
+ },
+ "sum256": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#N/A"
+    },
+    "B1": false,
+    "B2": {
+     "error": "#N/A"
+    }
+   }
+  }
+ },
+ "concat256": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#N/A"
+    }
+   }
+  }
+ },
+ "paren98": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1
+   }
+  }
+ },
+ "paren99": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#N/A"
+    },
+    "B1": 1
+   }
+  }
+ },
+ "abs98": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1
+   }
+  }
+ },
+ "abs99": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#N/A"
+    }
+   }
+  }
+ },
+ "mixed99": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#N/A"
+    }
+   }
+  }
+ },
+ "flat": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 51
+   }
+  }
+ },
+ "neg8000": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1
+   }
+  }
+ },
+ "arr": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#N/A"
+    }
+   }
+  }
+ },
+ "arrtok": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#N/A"
+    }
+   }
+  }
+ },
+ "chainif": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 7
+   }
+  }
+ }
+}

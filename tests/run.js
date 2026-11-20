@@ -4,7 +4,15 @@
 // Expected values were computed by LibreOffice (tools/lo_oracle.py).
 const fs = require('fs');
 const path = require('path');
+const { Worker, isMainThread } = require('worker_threads');
 const { computeWorkbook } = require('../src/engine.js');
+
+// run on a thread with the large stack bin/engine uses
+if (isMainThread) {
+  const w = new Worker(__filename, { argv: process.argv.slice(2), resourceLimits: { stackSizeMb: 256 } });
+  w.on('exit', (code) => process.exit(code));
+  return;
+}
 
 const dir = __dirname;
 const only = process.argv[2];

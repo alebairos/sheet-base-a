@@ -3,7 +3,20 @@
 // Engine CLI: engine <file|-> [--cell Sheet1!A1]
 const fs = require('fs');
 const path = require('path');
+const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
 const { computeWorkbook, parseAddr } = require(path.join(__dirname, '..', 'src', 'engine.js'));
+
+// The workbook is computed on a thread with a large stack: formulas as long
+// as Calc accepts (8191 tokens) nest deeper than Node's default stack allows.
+if (!isMainThread) {
+  parentPort.postMessage(JSON.stringify(computeWorkbook(JSON.parse(workerData))));
+  return;
+}
+function compute(text, done) {
+  const w = new Worker(__filename, { workerData: text, resourceLimits: { stackSizeMb: 256 } });
+  w.once('message', (m) => done(JSON.parse(m)));
+  w.once('error', (e) => { process.stderr.write(`engine: ${e && e.stack || e}\n`); process.exit(1); });
+}
 
 function usage() {
   process.stderr.write('usage: engine <file|-> [--cell Sheet!A1]\n');
@@ -28,13 +41,12 @@ try {
   process.stderr.write(`engine: cannot read ${file}: ${e.message}\n`);
   process.exit(1);
 }
-let wb;
-try { wb = JSON.parse(text); } catch (e) {
+try { JSON.parse(text); } catch (e) {
   process.stderr.write(`engine: invalid JSON: ${e.message}\n`);
   process.exit(1);
 }
 
-const out = computeWorkbook(wb);
+compute(text, (out) => {
 if (cell === null) {
   process.stdout.write(JSON.stringify(out) + '\n');
 } else {
@@ -59,3 +71,4 @@ if (cell === null) {
   const v = k === undefined ? null : cells[k];
   process.stdout.write(JSON.stringify(v) + '\n');
 }
+});
