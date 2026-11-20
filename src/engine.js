@@ -107,7 +107,13 @@
     if (a === b) return true;
     if (a === 0 || b === 0) return false;
     const d = Math.abs(a - b);
-    if (!isFinite(d) || d > Math.abs(a) * E48 || d > Math.abs(b) * E48) return false;
+    if (!isFinite(d)) return false;
+    // (beyond 2^-48 but within 2^-44, values that round to the same 15
+    // significant digits still count as equal: 1223082542420 = 1223082542420+18*2^-12)
+    if (d > Math.abs(a) * E48 || d > Math.abs(b) * E48) {
+      if (d > Math.abs(a) * E48 * 16 || d > Math.abs(b) * E48 * 16) return false;
+      if (round15fp(a) !== round15fp(b)) return false;
+    }
     // representable integers are never "approximately" equal (rtl::math::approxEqual)
     const repInt = (x) => Number.isInteger(x) && Math.abs(x) < 9007199254740992;
     return !(repInt(d) && repInt(a) && repInt(b));
@@ -135,6 +141,18 @@
     else tz = 52;
     const least = fhi || lo ? tz + 1 : 53;
     return Math.max(53 - least - e, 0);
+  }
+  // x rounded to 15 significant digits by scaling with a power of ten in floating point
+  function round15fp(x) {
+    const a = Math.abs(x);
+    const ne = 14 - Math.floor(Math.log10(a));
+    const f = Math.pow(10, Math.abs(ne));
+    let v = ne < 0 ? a / f : a * f;
+    if (!isFinite(v)) return x;
+    v = Math.round(v);
+    v = ne < 0 ? v * f : v / f;
+    if (!isFinite(v)) return x;
+    return x < 0 ? -v : v;
   }
   function approxValue(x) {
     if (!isFinite(x) || x === 0 || x > 2199023255552) return x;
