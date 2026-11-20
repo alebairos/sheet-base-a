@@ -1423,6 +1423,9 @@
               if (name !== 'IFERROR' && used(k) && node.args[k].t !== 'ref' && !(b instanceof Range) &&
                   (typeof b === 'boolean' || (b instanceof Matrix && (b.boolRes || b.data.some((row) => row.some((x) => typeof x === 'boolean')))))) anyBool = true;
               if (b instanceof Range) b = this.rangeMatrix(b);
+              // (a 3D reference: its first sheet's range, in workbook order;
+              // another reference list: as in a scalar position)
+              else if (b instanceof RefList) b = b.is3d ? this.rangeMatrix(b.ranges[0]) : this.scalar(b, ctx);
               // a branch's error is only the element's, unless a computed
               // error went through a further operation in the branch
               if (isErr(b) && !b.fromRef && !this.pend && this.lastChildErr) this.pend = { err: b, clr: this.clr };
@@ -3373,7 +3376,17 @@
       this.fa = (this.fa || 0) + 1;
       let v;
       try { v = this.aev(n, ctx); } finally { this.fa--; }
-      if (isMV(v)) return E.VALUE;
+      if (isMV(v) || (v instanceof RefList && v.is3d)) return E.VALUE;
+      // (a reference list: each of its ranges is a factor of its own,
+      // SUMPRODUCT((A1:A2,B1:B2)) is A1*B1+A2*B2)
+      if (v instanceof RefList) {
+        for (const rg of v.ranges) {
+          const x = rg.rows === 1 && rg.cols === 1 ? this.cellValue(rg.sheet, rg.r1, rg.c1) : null;
+          if (isErr(x)) args.push({ err: x, cell: true });
+          else args.push({ g: this.rangeMatrix(rg).data });
+        }
+        continue;
+      }
       if (isErr(v)) args.push({ err: v, cell: n.t === 'ref' && !n.b });
       else args.push({ g: v instanceof Matrix ? v.data : [[v]] });
     }
