@@ -2349,7 +2349,8 @@
     if (mode !== 0 && typeof v === 'string' && hasWild(v) && (ranges === 'col' || ranges === 'row')) {
       let i = list.findIndex((x) => lookupEq(v, x, false));
       if (i < 0) return mode > 0 ? sortedLookup(list, v, true, ranges === 'col') : wildDescWalk(list, v);
-      while (i + 1 < list.length && lookupEq(v, list[i + 1], false)) i++;
+      // (the run of matching cells goes on over blank cells)
+      for (let j = i + 1; j < list.length; j++) { const x = list[j]; if (x === null || x === undefined) continue; if (lookupEq(v, x, false)) i = j; else break; }
       return i;
     }
     // (inline arrays compare a pattern as plain text in a sorted search)
