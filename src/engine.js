@@ -1292,7 +1292,10 @@
       let n = node;
       while (n.t === 'paren') n = n.a;
       if (n.t === 'ref' || n.t === 'rangeop') return this.ev(n, ctx);
-      return this.aev(n, ctx);
+      // (force array: functions inside take array arguments too,
+      // MATCH(1,INDEX((A1:A3=2)*(B1:B3=20),0),0))
+      this.fa = (this.fa || 0) + 1;
+      try { return this.aev(n, ctx); } finally { this.fa--; }
     }
     // element-wise map; a single row/column is repeated, otherwise the
     // result is as large as the smallest operand
@@ -1339,7 +1342,7 @@
     // a formula part holding an inline array ({1,2}*2, LEN({"a","bb"})) is
     // computed element by element even outside array functions, as in Calc
     ev(node, ctx) {
-      if (this.fa && !this.inElem && (node.t === 'bin' || node.t === 'neg' || node.t === 'pct' || node.t === 'fn')) {
+      if (this.fa && (node.t === 'bin' || node.t === 'neg' || node.t === 'pct' || node.t === 'fn')) {
         const v = this.aev1(node, ctx, false);
         return v instanceof Range ? v : this.aevPost(v, ctx, false);
       }
@@ -2861,6 +2864,16 @@
     'RIGHT', 'MID', 'TRIM', 'VALUE', 'MOD', 'POWER', 'SQRT', 'EXACT', 'EXP', 'LN', 'SEARCH', 'FIND', 'SUBSTITUTE',
     'PROPER', 'REPT', 'CODE', 'CHAR', 'ISODD', 'ISEVEN', 'N', 'T', 'CONCATENATE', 'LOG', 'LOG10', 'FACT', 'EVEN', 'ODD',
     'TEXT', 'QUOTIENT', 'CEILING', 'FLOOR', 'RANDBETWEEN']);
+  def('TRANSPOSE', 1, 1, function (nodes, ctx) {
+    if (nodes[0].t === 'missing') return E.PARAM;
+    let v = this.fev(nodes[0], ctx);
+    if (v instanceof Range) v = this.rangeMatrix(v);
+    // (booleans come out as numbers)
+    const nb = (x) => (typeof x === 'boolean' ? +x : x);
+    if (!(v instanceof Matrix)) return nb(v);
+    const d = v.data;
+    return new Matrix(d[0].map((_, c) => d.map((row) => nb(row[c]))));
+  });
   def('SUMPRODUCT', 1, undefined, function (nodes, ctx) {
     const grids = [];
     for (const n of nodes) {
