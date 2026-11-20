@@ -140,7 +140,17 @@
     if (!isFinite(x) || x === 0 || x > 2199023255552) return x;
     const a = Math.abs(x);
     if ((Number.isInteger(a) && a < 9007199254740992) || fracBits(a) <= 11) return x;
-    return Number(x.toPrecision(15));
+    // 15 significant digits as rtl_math_approxValue gets them: scaled by a
+    // power of ten in floating point, so the scaling's own rounding counts
+    // (ROUND(5805.4999999999945,0) is 5806)
+    const ne = 14 - Math.floor(Math.log10(a));
+    const f = Math.pow(10, Math.abs(ne));
+    let v = ne < 0 ? a / f : a * f;
+    if (!isFinite(v)) return x;
+    v = Math.round(v);
+    v = ne < 0 ? v * f : v / f;
+    if (!isFinite(v)) return x;
+    return x < 0 ? -v : v;
   }
   const approxFloor = (x) => Math.floor(approxValue(x));
 
