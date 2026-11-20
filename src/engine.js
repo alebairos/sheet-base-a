@@ -2223,11 +2223,12 @@
       start = broken ? idx[0] : found !== null ? idx[found] : idx[last];
     }
     let foundRow = -1, fsi = firstStringIgnore && !skipped, eq = false;
-    // (along a row, an ascending text search passes over numbers, but a
+    // (after the binary search (a column) or along a row, an ascending
+    // text search walks on past numbers, but a
     // number undoes the match found so far until the next one, and a first
     // text passed over after numbers is no match: MATCH("x",A1:B1) is 2 with
     // -3,"b" and #N/A with "b",-3; MATCH("x",A1:C1) with "a",1,"b" is 3)
-    const passNums = !binary && byStr && asc;
+    const passNums = byStr && asc;
     let leadNums = false;
     for (let r = start; r < n; r++) {
       const c = list[r];
