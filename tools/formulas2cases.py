@@ -20,6 +20,12 @@ if os.environ.get("DATASET") == "2":
     DATA = {"A1": -3, "A2": 0, "A3": 0.5, "A4": 2, "A5": 2, "A6": 7, "A7": "7", "A8": 15, "A9": "=NA()", "A10": "apple",
             "A11": "Apple", "A12": "=SQRT(-4)", "B1": "b", "B2": "a", "B3": True, "B4": "", "B5": 3, "B6": "=A6*2",
             "B7": "x y", "B8": " lead", "B9": -0.25, "B10": "=\"\"", "B11": 1E10, "B12": "zeta"}
+# DATASET=3: other error kinds, FALSE, numeric text with spaces, unicode, large/small numbers
+if os.environ.get("DATASET") == "3":
+    DATA = {"A1": 4, "A2": "=INDEX(B1:B2,3)", "A3": -2, "A4": " 12 ", "A5": False, "A6": "=FOO()", "A7": 1E-9,
+            "A8": 123456789, "A9": "Ünïcode", "A10": "=1E200*1E200", "A11": 0.1, "A12": "a*b",
+            "B1": 3, "B2": 3, "B3": "3", "B4": "-", "B5": "TRUE", "B6": 1.5, "B7": "=A1>2", "B8": "x",
+            "B9": "=A3*A3", "B10": "=\"\"&\"\"", "B11": "Z", "B12": -0.5}
 SHEET2 = {"A1": 10, "A2": 20, "A3": "two", "B1": "=A1*2"}
 
 cases = {}
