@@ -402,7 +402,7 @@
       }
       const two = src.substr(i, 2);
       if (two === '<=' || two === '>=' || two === '<>') { toks.push({ t: 'op', v: two }); i += 2; continue; }
-      if ('+-*/^&=<>%(),;{}:!'.indexOf(ch) >= 0) { toks.push({ t: 'op', v: ch }); i++; continue; }
+      if ('+-*/^&=<>%(),;{}:!@'.indexOf(ch) >= 0) { toks.push({ t: 'op', v: ch }); i++; continue; }
       throw new SyntaxError('unexpected character ' + ch);
     }
     toks.push({ t: 'eof' });
@@ -455,6 +455,7 @@
     function unary() {
       if (isOp('-')) { p++; return { t: 'neg', a: unary() }; }
       if (isOp('+')) { p++; return unary(); }
+      if (isOp('@')) { p++; return { t: 'at', a: unary() }; } // implicit intersection
       return postfix();
     }
     function postfix() {
@@ -541,6 +542,7 @@
           if (t.v === '{') return arrayConst();
           if (t.v === '-') return { t: 'neg', a: unary() };
           if (t.v === '+') return unary();
+          if (t.v === '@') return { t: 'at', a: unary() };
           break;
       }
       const e = new SyntaxError('unexpected token');
@@ -719,9 +721,11 @@
 
     // ---- array evaluation (SUMPRODUCT's arguments): ranges become matrices,
     // operators and scalar functions apply element by element
-    aev(node, ctx) {
-      const v = this.aev1(node, ctx);
-      return v instanceof Range ? this.rangeMatrix(v) : v;
+    // sc: ranges are intersected with the formula cell (an ordinary formula
+    // whose inline arrays still compute element by element)
+    aev(node, ctx, sc) {
+      const v = this.aev1(node, ctx, sc);
+      return v instanceof Range ? (sc ? this.intersect(v, ctx) : this.rangeMatrix(v)) : v;
     }
     rangeMatrix(v) {
       const sh = v.sheet;
@@ -734,24 +738,36 @@
       }
       return new Matrix(rows);
     }
-    aev1(node, ctx) {
+    aev1(node, ctx, sc) {
       const lit = (x) => (x === MISSING ? { t: 'missing' } : { t: 'lit', v: x });
       switch (node.t) {
-        case 'paren': return this.aev(node.a, ctx);
+        case 'paren': return this.aev(node.a, ctx, sc);
         case 'neg': case 'pct': {
-          const a = this.aev(node.a, ctx);
-          if (!(a instanceof Matrix)) return this.ev(node, ctx);
+          const a = this.aev(node.a, ctx, sc);
+          if (!(a instanceof Matrix)) return this.ev0(node, ctx);
           return this.amap([a], (x) => this.ev({ t: node.t, a: lit(x) }, ctx));
         }
         case 'bin': {
-          const a = this.aev(node.a, ctx), b = this.aev(node.b, ctx);
+          const a = this.aev(node.a, ctx, sc), b = this.aev(node.b, ctx, sc);
           if (!(a instanceof Matrix) && !(b instanceof Matrix)) return asComputed(this.binop({ op: node.op, a: lit(a), b: lit(b) }, ctx));
           return this.amap([a, b], (x, y) => asComputed(this.binop({ op: node.op, a: lit(x), b: lit(y) }, ctx)));
         }
         case 'fn': {
-          if (!ELEMENTWISE.has(node.name)) return this.ev(node, ctx);
-          const args = node.args.map((n) => (n.t === 'missing' ? MISSING : this.aev(n, ctx)));
-          if (!args.some((m) => m instanceof Matrix)) return this.ev(node, ctx);
+          const mp = MAPPED_PARAMS[node.name];
+          if (mp) {
+            // a criterion / lookup value / index given as an array: one call per element
+            const args = mp.map((i) => (i < node.args.length && node.args[i].t !== 'missing' ? this.aev(node.args[i], ctx, sc) : null));
+            if (!args.some((m) => m instanceof Matrix)) return this.ev0(node, ctx);
+            return this.amap(args, (...xs) => {
+              const a2 = node.args.slice();
+              mp.forEach((i, k) => { if (args[k] !== null) a2[i] = lit(xs[k]); });
+              const r = this.call({ t: 'fn', name: node.name, args: a2 }, ctx);
+              return asComputed(r instanceof Range ? this.intersect(r, ctx) : r instanceof Matrix ? r.data[0][0] : r);
+            });
+          }
+          if (!ELEMENTWISE.has(node.name)) return this.ev0(node, ctx);
+          const args = node.args.map((n) => (n.t === 'missing' ? MISSING : this.aev(n, ctx, sc)));
+          if (!args.some((m) => m instanceof Matrix)) return this.ev0(node, ctx);
           return this.amap(args, (...xs) => asComputed(this.call({ t: 'fn', name: node.name, args: xs.map(lit) }, ctx)));
         }
         default: return this.ev(node, ctx);
@@ -794,7 +810,13 @@
       return this.wb.sheet(name);
     }
 
+    // a formula part holding an inline array ({1,2}*2, LEN({"a","bb"})) is
+    // computed element by element even outside array functions, as in Calc
     ev(node, ctx) {
+      if ((node.t === 'bin' || node.t === 'neg' || node.t === 'pct' || node.t === 'fn') && hasArr(node)) return this.aev(node, ctx, true);
+      return this.ev0(node, ctx);
+    }
+    ev0(node, ctx) {
       switch (node.t) {
         case 'num': return node.v;
         case 'str': return node.v;
@@ -804,6 +826,13 @@
         case 'missing': return MISSING;
         case 'lit': return node.v;
         case 'paren': return this.ev(node.a, ctx);
+        case 'at': {
+          const v = this.ev(node.a, ctx);
+          if (v instanceof Range) return this.intersect(v, ctx);
+          if (v instanceof Matrix) return v.data[0][0];
+          if (v instanceof RefList) return E.VALUE;
+          return v;
+        }
         case 'name': return E.NAME;
         case 'ref': {
           const sh = this.resolveSheet(node.sheet, ctx);
@@ -1317,6 +1346,16 @@
     return best;
   }
 
+
+  // does the expression contain an inline array constant? (cached on the node)
+  function hasArr(node) {
+    if (node._arr !== undefined) return node._arr;
+    let r = node.t === 'arr';
+    if (!r) for (const k of ['a', 'b']) if (node[k] && typeof node[k] === 'object' && node[k].t && hasArr(node[k])) r = true;
+    if (!r && node.args) r = node.args.some((n) => n && n.t && hasArr(n));
+    node._arr = r;
+    return r;
+  }
 
   // ---------------------------------------------------------------- functions
   const FUNCS = {};
@@ -2001,6 +2040,8 @@
     if (isErr(v)) return v;
     return v instanceof Range || v instanceof Matrix ? v.cols : E.VALUE;
   });
+  // parameters that take one value: an array there gives one result per element
+  const MAPPED_PARAMS = { COUNTIF: [1], SUMIF: [1], AVERAGEIF: [1], VLOOKUP: [0], HLOOKUP: [0], MATCH: [0], INDEX: [1, 2] };
   const ELEMENTWISE = new Set(['IF', 'IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISNA', 'ISERR', 'ISLOGICAL',
     'ISNONTEXT', 'LEN', 'ABS', 'ROUND', 'ROUNDUP', 'ROUNDDOWN', 'INT', 'TRUNC', 'SIGN', 'NOT', 'UPPER', 'LOWER', 'LEFT',
     'RIGHT', 'MID', 'TRIM', 'VALUE', 'MOD', 'POWER', 'SQRT', 'EXACT', 'EXP', 'LN', 'SEARCH', 'FIND', 'SUBSTITUTE',

@@ -30,7 +30,8 @@ Requires Node.js (>= 18). No dependencies, no build step.
 - Booleans are numbers with a boolean format, as in Calc: `TRUE+1` is 2, `TRUE&""` is `"1"`, and a result is reported as `true`/`false` when Calc would format it as a boolean.
 - An empty text constant (`""`) in the input is an empty cell.
 - A lookup (MATCH, VLOOKUP, HLOOKUP) whose lookup value is a computed `#N/A` gives Calc's internal lookup error: shown as `#N/A`, but `ISNA` is false and `ISERR` true. A `#N/A` read from a cell stays a plain `#N/A`.
-- SUMPRODUCT's arguments and the table argument of MATCH/VLOOKUP/HLOOKUP are evaluated as arrays (`SUMPRODUCT((A1:A9>1)*B1:B9)`); elsewhere a range in a scalar position is intersected with the formula's row or column, as in Calc.
+- SUMPRODUCT's arguments and the table argument of MATCH/VLOOKUP/HLOOKUP are evaluated as arrays (`SUMPRODUCT((A1:A9>1)*B1:B9)`); elsewhere a range in a scalar position is intersected with the formula's row or column, as in Calc. Inline arrays stay arrays in any formula (`SUM({1,2}*{3,4})`, `SUM(LEN({"a","bb"}))`, `IF({1,0},...)`), with ranges beside them still intersected; an array given as a COUNTIF/SUMIF/AVERAGEIF criterion, a MATCH/VLOOKUP/HLOOKUP lookup value or an INDEX position gives one result per element (`SUMPRODUCT(1/COUNTIF(A1:A9,A1:A9))`). `@A1:A3` is the implicit intersection.
+- SUM reports range errors the way Calc's per-column sum meets them: in the first column holding an error, the first error of the last run of formula cells (booleans count as formula cells, as after an xlsx import) that has one.
 
 ## Known deviations
 

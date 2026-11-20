@@ -1,0 +1,74 @@
+SUM(A:A)
+SUM(A:B)
+COUNT(B:B)
+SUM(1:3)
+SUM($A1:B$3)
+SUM(Sheet2!A:A)
+sum(a1:a3)
+ SUM( A1 , A2 )
++A1
+=A1
+SUM(Sheet2!A1:Sheet2!A2)
+true
+TRUE+true
+"say ""hi"""
+LEN("say ""hi""")
+A1 + B1
+( A1 )*2
+SUM((A1:A3))
+-(-A1)
+---A1
+1e2
+1E+2
+.5+1
+1.
+5.E1
+SUM(A1:A3,)
+IF(1,"a";"b")
+A1:A3
+B1:B3
+SUM(A3:A1)
+SUM(B3:A1)
+$A$1+$B$1
+A$1*$B1
+Sheet2!$A$1
+'Sheet2'!A1
+SUM('Sheet2'!A1:A2)
+COUNTA(Sheet2!A1:B3)
+VLOOKUP("two",Sheet2!A1:B3,1,0)
+MATCH(20,Sheet2!A1:A3,0)
+INDEX(Sheet2!A1:B3,1,2)
+1+"1e1"
+"1"*"2"
+" 3 "+1
+"3 4"+1
+""+1
+"-"+1
+CONCATENATE("a",,"b")
+CONCATENATE()
+LEN()
+ROUND(1.5,)
+MID("abc",,1)
+NOT()
+IF()
+SUM(
+SUM(A1
+1+
+(1
+1)
+"abc
+@A1
+A0
+ZZZZ1
+XFD1
+XFE1
+A1048576
+A1048577
+#N/A
+NA()
+#DIV/0!+1
+ISERROR(#VALUE!)
+{1,2,3}
+SUM({1,2,3})
+SUM({1;2;3}*2)
+INDEX({1,2;3,4},2,1)
