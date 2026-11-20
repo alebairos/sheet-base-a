@@ -2,7 +2,7 @@
 'use strict';
 // Dev-only: random workbooks with three sheets (one needing quotes), a 5x10
 // grid, all 40 spec functions, chains between sheets and the odd cycle.
-// Usage: node tools/fuzzwb2.js <seed> <count> > tests/cases/name.json
+// Usage: [FUZZ_ERRLIT=1] node tools/fuzzwb2.js <seed> <count> > tests/cases/name.json
 const seed0 = parseInt(process.argv[2] || '1', 10);
 const count = parseInt(process.argv[3] || '50', 10);
 let seed = seed0;
@@ -45,7 +45,10 @@ function makeBook() {
     return chance(0.25) ? q(pick(SHEETS.filter((x) => x !== s))) + '!' + t : t;
   };
   const col = (s) => { const c = pick(['A', 'B', 'C']); const r1 = 1 + Math.floor(rnd() * 3); return c + r1 + ':' + c + (r1 + 4 + Math.floor(rnd() * 3)); };
-  const leaf = (s) => (chance(0.55) ? ref(s) : pick(['1', '2', '0', '3', '"a"', '""', 'TRUE', 'FALSE', '-1', '0.5', '"3"', '"apple"', '10', '2.5']));
+  const LEAVES = ['1', '2', '0', '3', '"a"', '""', 'TRUE', 'FALSE', '-1', '0.5', '"3"', '"apple"', '10', '2.5'];
+  // FUZZ_ERRLIT=1: error constants among the leaves too
+  if (process.env.FUZZ_ERRLIT) LEAVES.push('#N/A', '#DIV/0!', '#VALUE!', '#NUM!');
+  const leaf = (s) => (chance(0.55) ? ref(s) : pick(LEAVES));
   const expr = (s, d) => {
     if (d <= 0) return leaf(s);
     const k = rnd();

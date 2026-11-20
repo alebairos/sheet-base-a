@@ -63,11 +63,14 @@
   // the error token of an earlier parameter (popped later) replaces a
   // conversion error met in parameter k
   const tokBefore = (vals, k, e) => {
-    if (e && e.tok) return e;
+    // (error tokens overwrite the error as Calc pops them: the leftmost wins)
     for (let j = 0; j < k; j++) if (isErr(vals[j]) && vals[j].tok) return vals[j];
     return e;
   };
-  const asComputed = (v) => (isErr(v) && v.fromRef ? errByCode(v.code) : v);
+  // (Calc's internal lookup error read from a cell keeps its code when a
+  // later reset makes it an operand: it stays #N/A in files)
+  const LOOKNA_CELL = new FErr('Err:LOOKNA', false);
+  const asComputed = (v) => (isErr(v) && v.fromRef ? (v.code === 'Err:LOOKNA' ? LOOKNA_CELL : errByCode(v.code)) : v);
 
   // ---------------------------------------------------------------- helpers
   const MAXROW = 1048576, MAXCOL = 16384;
@@ -1278,6 +1281,8 @@
           // IF and CHOOSE pass on what their chosen argument left
           if (!PASS_FMT.has(node.name)) this.boolLost = this.retLost;
           this.retLost = false;
+          // IF and CHOOSE leave an error constant on the stack as it is
+          if (isErr(r) && r.lit && PASS_FMT.has(node.name)) return r;
           return r === UNKNOWN_FN ? r : asComputed(r); }
       }
       return E.VALUE;
@@ -1332,6 +1337,8 @@
       // reference/conversion errors, which are checked right operand first.
       if (isErr(a) && !a.fromRef) return a;
       if (isErr(b) && !b.fromRef) return b;
+      // a left error token overwrites whatever error the right operand set
+      if (isErr(a) && a.tok) return a;
       const op = node.op;
       if (op === '&') {
         const sb = this.toStr(b); if (isErr(sb)) return sb;
@@ -1440,7 +1447,8 @@
       const parts = [];
       // error tokens popped later overwrite the error (the first one wins)
       const tokOver = (k, e) => {
-        if (opts.forward || opts.noTok) return e;
+        if (opts.noTok) return e;
+        if (opts.forward) { for (let j = vals.length - 1; j > k; j--) if (isErr(vals[j]) && vals[j].tok) return vals[j]; return e; }
         for (let j = 0; j < k; j++) if (isErr(vals[j]) && vals[j].tok) return vals[j];
         return e;
       };
@@ -1495,7 +1503,7 @@
           }
         } else if (typeof v === 'number') { nums.push(v); } else if (typeof v === 'boolean') { nums.push(v ? 1 : 0); } else if (v === EMPTYR || isLB(v)) { nums.push(0); } else if (isErr(v)) { if (!opts.skipErrors) return { err: tokOver(k, v) }; } else if (typeof v === 'string') {
           const n = textToNum(v);
-          if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: tokBefore(opts.forward || opts.noTok ? [] : vals, k, opts.textParam ? E.PARAM : E.VALUE) };
+          if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: opts.forward ? tokOver(k, opts.textParam ? E.PARAM : E.VALUE) : tokBefore(opts.noTok ? [] : vals, k, opts.textParam ? E.PARAM : E.VALUE) };
         }
         if (parts[parts.length - 1] === nums) parts[parts.length - 1] = nums.slice(n0);
         else if (nums.length > n0 && !(v instanceof Range)) parts.push(nums[n0]);
@@ -2036,20 +2044,29 @@
   });
 
   // ---- conditional aggregates
-  function condArgs(self, nodes, ctx) {
+  // (count: COUNTIF, where an error constant as the range is the result)
+  function condArgs(self, nodes, ctx, count) {
     const rg = self.ev(nodes[0], ctx);
-    if (isErr(rg)) return rg;
-    if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.PARAM;
+    if (isErr(rg) && !rg.tok) return rg;
     let crit = self.sv(nodes[1], ctx);
+    const s = nodes.length > 2 && nodes[2].t !== 'missing' ? self.ev(nodes[2], ctx) : undefined;
+    // computed errors first (in order); then, as Calc pops the parameters,
+    // the sum range (anything but a range is #VALUE!), the criterion, the range
+    if (isErr(crit) && !crit.fromRef) return crit;
+    if (isErr(s) && !s.fromRef) return s;
+    if (nodes.length > 2) {
+      if (nodes[2].t === 'missing') return E.PARAM;
+      if (isErr(s) || !(s instanceof Range || s instanceof Matrix)) return E.VALUE;
+    }
+    const critErr = isErr(crit) && crit.tok ? crit : null;
+    if (isErr(rg)) return count ? rg : critErr || E.VALUE;
+    if (!(rg instanceof Range) && !(rg instanceof Matrix)) return critErr || E.PARAM;
     if (crit === MISSING || isLB(crit)) crit = null;
     if (crit === EMPTYR) crit = 0;
     const match = makeCriterion(crit);
     if (isErr(match)) return match;
     let sum = rg;
     if (nodes.length > 2) {
-      if (nodes[2].t === 'missing') return E.PARAM;
-      const s = self.ev(nodes[2], ctx);
-      if (isErr(s)) return s;
       if (rg instanceof Matrix) {
         // an inline array: elements beyond the sum array are skipped
         if (!(s instanceof Matrix)) return E.VALUE;
@@ -2098,7 +2115,7 @@
     return kahan(r.nums) / r.nums.length;
   });
   def('COUNTIF', 2, 2, function (nodes, ctx) {
-    const a = condArgs(this, nodes, ctx); if (isErr(a)) return a;
+    const a = condArgs(this, nodes, ctx, true); if (isErr(a)) return a;
     let n = 0;
     const rg = a.rg;
     if (rg instanceof Matrix) {
@@ -2119,7 +2136,7 @@
   // ---- logic
   def('IF', 1, 3, function (nodes, ctx) {
     const c = this.sv(nodes[0], ctx);
-    if (isErr(c)) return c;
+    if (isErr(c)) return c.lit ? errByCode(c.code) : c; // (an error constant condition: now pending)
     const b = this.toBool(c);
     if (isErr(b)) return b;
     this.boolLost = false;
@@ -2217,13 +2234,15 @@
   def('CONCATENATE', 0, undefined, function (nodes, ctx) {
     const vals = this.svAll(nodes, ctx);
     for (const v of vals) if (isErr(v) && !v.fromRef) return v;
-    let s = '';
+    // parameters are taken first to last: the first error is the result,
+    // but an error token overwrites it (the last one wins)
+    let s = '', err = null;
     for (const v of vals) {
       const t = this.toStr(v);
-      if (isErr(t)) return t;
-      s += t;
+      if (isErr(t)) { if (!err || t.tok) err = t; continue; }
+      if (!err) s += t;
     }
-    return s;
+    return err || s;
   });
   // Calc's LEN/LEFT/RIGHT/MID count Unicode code points, not UTF-16 units
   const codePoints = (s) => Array.from(s);
@@ -2488,7 +2507,7 @@
     return new TextEncoder().encode(a[0][0])[0];
   });
   def('CHOOSE', 2, undefined, function (nodes, ctx) {
-    const a = this.args(nodes.slice(0, 1), ctx, ['n']); if (isErr(a)) return a;
+    const a = this.args(nodes.slice(0, 1), ctx, ['n']); if (isErr(a)) return a.lit ? errByCode(a.code) : a;
     const i = Math.trunc(a[0]);
     if (i < 1 || i >= nodes.length) return E.IARG;
     this.boolLost = false;
@@ -2635,9 +2654,10 @@
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
     if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
     if (isErr(v) && !v.fromRef) return lookErr(v);
-    if (isErr(v) && v.lit) return E.VALUE;
-    if (isErr(tbl)) return tbl;
+    if (isErr(tbl) && !tbl.lit) return tbl;
     if (isErr(rest)) return rest;
+    // an error constant as the table or the lookup value: #VALUE!
+    if (isErr(tbl) || (isErr(v) && v.lit)) return E.VALUE;
     const row = Math.trunc(rest[0]);
     const sorted = nodes.length > 3 && nodes[3].t === 'missing' ? false : rest[1];
     if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
@@ -2660,9 +2680,9 @@
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
     if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
     if (isErr(v) && !v.fromRef) return lookErr(v);
-    if (isErr(v) && v.lit) return E.VALUE;
-    if (isErr(tbl)) return tbl;
+    if (isErr(tbl) && !tbl.lit) return tbl;
     if (isErr(rest)) return rest;
+    if (isErr(tbl) || (isErr(v) && v.lit)) return E.VALUE;
     const col = Math.trunc(rest[0]);
     const sorted = nodes.length > 3 && nodes[3].t === 'missing' ? false : rest[1];
     if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
@@ -2685,10 +2705,10 @@
     const rest = this.args(nodes.slice(2), ctx, ['n'], [1]);
     if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
     if (isErr(v) && !v.fromRef) return lookErr(v);
-    if (isErr(v) && v.lit) return E.VALUE;
-    if (isErr(rg)) return rg;
+    if (isErr(rg) && !rg.lit) return rg;
     if (rg === MISSING) return E.PARAM;
     if (isErr(rest)) return rest;
+    if (isErr(rg) || (isErr(v) && v.lit)) return E.VALUE;
     // the match type is truncated: -1, 0 or 1, anything else is a parameter error
     const mode = Math.trunc(rest[0]);
     if (mode < -1 || mode > 1) return E.PARAM;
@@ -2703,9 +2723,11 @@
   });
   def('INDEX', 1, 4, function (nodes, ctx) {
     const ref = this.ev(nodes[0], ctx);
-    if (isErr(ref)) return ref;
+    if (isErr(ref) && !ref.lit) return ref;
     const a = this.args(nodes.slice(1), ctx, ['n', 'n', 'n'], [0, undefined, 1]);
     if (isErr(a)) return a;
+    // an error constant as the reference: after the other parameters and the area
+    if (isErr(ref)) return Math.trunc(a[2]) !== 1 ? (a[2] < 1 ? E.IARG : E.REF) : ref;
     let row = Math.trunc(a[0]);
     let col = a[1] === undefined ? undefined : Math.trunc(a[1]);
     let tgt = ref;
