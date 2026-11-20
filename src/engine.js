@@ -774,13 +774,29 @@
       if (cell.state === 2) return cell.value;
       // A cell that is being computed reads as an error (Calc's Err:522, which
       // round-trips as #VALUE!); the error then propagates through the cycle.
-      if (cell.state === 1) return EREF['Err:522'];
+      // If the formulas computing between that cell and this read already have
+      // a pending error, the read gives the earliest such error instead (Calc
+      // reads the running cell while that error is set).
+      if (cell.state === 1) {
+        const st = this.running;
+        let i = st.length - 1;
+        while (i >= 0 && st[i].cell !== cell) i--;
+        for (let k = i; k >= 0 && k < st.length; k++) {
+          const fe = st[k].fe;
+          if (fe && fe.clr === (k + 1 < st.length ? st[k + 1].clr : this.clr)) return fe.err;
+        }
+        return EREF['Err:522'];
+      }
       this.evalCell(sh, cell);
       return cell.value;
     }
 
     evalCell(sh, cell) {
       cell.state = 1;
+      if (!this.running) this.running = [];
+      // fe: the first error computed in the formula so far (Calc's pending
+      // error); clr: the caller's reset count when this cell started
+      this.running.push({ cell, fe: null, clr: this.clr });
       let v;
       if (cell.parseError || !cell.ast) v = cell.parseError ? errByCode(cell.parseError) : null;
       else {
@@ -799,6 +815,7 @@
         this.pend = pend;
         this.errSeen = seen; this.lastChildErr = lce;
       }
+      this.running.pop();
       if (isErr(v)) v = asComputed(v);
       cell.value = v;
       cell.state = 2;
@@ -1211,6 +1228,10 @@
       const s = this.errSeen;
       this.errSeen = false;
       const r = this.ev0x(node, ctx);
+      if (isErr(r) && !r.fromRef && !r.tok && this.running) {
+        const top = this.running[this.running.length - 1];
+        if (top && !top.sup && (!top.fe || top.fe.clr !== this.clr)) top.fe = { err: r, clr: this.clr };
+      }
       this.lastChildErr = this.errSeen;
       this.errSeen = s || (isErr(r) && !r.fromRef);
       return r;
@@ -1380,9 +1401,14 @@
 
     // ---- operators
     binop(node, ctx) {
-      let a = this.sv(node.a, ctx);
+      // a reference operand is read when the operator runs, after both
+      // operands are computed, the right one first (as Calc pops them): this
+      // only matters for when a cell inside a reference cycle is computed
+      const ra = this.ev(node.a, ctx);
       const clr = this.clr;
-      const b = this.sv(node.b, ctx);
+      const rb = this.ev(node.b, ctx);
+      const b = this.scalar(rb, ctx);
+      let a = this.scalar(ra, ctx);
       // a function that clears Calc's pending error (IFERROR, ISNUMBER, ...)
       // ran after the left operand: its error is then an ordinary operand
       if (this.clr !== clr) a = demote(a);
@@ -1434,7 +1460,13 @@
       // too few arguments: Err:511; too many: Err:508 for one-parameter functions, else Err:504
       if (n < f.min) return E.NOARG;
       if (f.max !== undefined && n > f.max) return f.max === 1 ? E.PAREN : E.PARAM;
-      const r = f.fn.call(this, node.args, ctx);
+      // a function that resets the pending error (IFERROR's value, IS...,
+      // COUNT, N) computes its arguments with no pending error (seen by a
+      // cycle read): errors there are values on Calc's stack
+      const top = CLEARS_ERROR.has(node.name) && this.running && this.running[this.running.length - 1];
+      if (top) { top.fe = null; top.sup = (top.sup || 0) + 1; }
+      let r;
+      try { r = f.fn.call(this, node.args, ctx); } finally { if (top) top.sup--; }
       if (CLEARS_ERROR.has(node.name)) this.clr++;
       return r;
     }
@@ -2217,7 +2249,11 @@
     if (s === UNKNOWN_FN) return E.NOOP;
     if (isErr(s)) {
       this.boolLost = false;
-      const alt = this.ev(nodes[1], ctx);
+      // the alternative is computed as an ordinary part of the formula
+      const top = this.running && this.running[this.running.length - 1];
+      if (top) { top.fe = null; top.sup--; }
+      let alt;
+      try { alt = this.ev(nodes[1], ctx); } finally { if (top) top.sup++; }
       this.retLost = this.boolLost;
       return alt === MISSING ? 0 : alt;
     }
@@ -2399,6 +2435,8 @@
   def('ISNONTEXT', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) !== 'string'; });
   def('N', 1, 1, function (nodes, ctx) {
     const v = this.sv(nodes[0], ctx);
+    // Calc's internal lookup error (VLOOKUP(1/0,...)) is #VALUE! to N
+    if (v === E.LOOKNA || (isErr(v) && v.look)) return E.VALUE;
     if (isErr(v)) return v;
     if (typeof v === 'number') return v;
     if (typeof v === 'boolean') return v ? 1 : 0;
