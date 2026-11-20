@@ -1113,7 +1113,9 @@
     // Evaluate fixed scalar arguments with Calc's error order:
     // computed errors left to right, then conversion right to left.
     // kinds: 'n' number, 's' string, 'b' bool, 'v' any scalar
-    args(nodes, ctx, kinds, defaults) {
+    // checks[i](value): a function's own validity check of parameter i, made
+    // as Calc pops it (last parameter first), before earlier ones are converted
+    args(nodes, ctx, kinds, defaults, checks) {
       const vals = [], clrs = [];
       for (let i = 0; i < kinds.length; i++) {
         if (i >= nodes.length) { vals.push(undefined); continue; }
@@ -1139,6 +1141,7 @@
           default: r = v;
         }
         if (isErr(r)) return r;
+        if (checks && checks[i] && r !== undefined) { const e = checks[i](r); if (e) return e; }
         out[i] = r;
       }
       return out;
@@ -1906,23 +1909,25 @@
   const codePoints = (s) => Array.from(s);
   const cpCount = (s) => codePoints(s).length;
   const INT32 = 2147483647; // text positions and lengths are 32-bit in Calc
+  // a negative or too large text length / position is an error as soon as it
+  // is popped (before truncation); a start below 1 only after all arguments
+  const lenCheck = (x) => (x < 0 || Math.trunc(x) > INT32 ? E.IARG : null);
+
   def('LEFT', 1, 2, function (nodes, ctx) {
-    const a = this.args(nodes, ctx, ['s', 'n'], [undefined, 1]); if (isErr(a)) return a;
+    const a = this.args(nodes, ctx, ['s', 'n'], [undefined, 1], [null, lenCheck]); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
-    if (a[1] < 0 || n > INT32) return E.IARG; // checked before truncation
     return codePoints(a[0]).slice(0, n).join('');
   });
   def('RIGHT', 1, 2, function (nodes, ctx) {
-    const a = this.args(nodes, ctx, ['s', 'n'], [undefined, 1]); if (isErr(a)) return a;
+    const a = this.args(nodes, ctx, ['s', 'n'], [undefined, 1], [null, lenCheck]); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
-    if (a[1] < 0 || n > INT32) return E.IARG;
     const cps = codePoints(a[0]);
     return n === 0 ? '' : cps.slice(Math.max(0, cps.length - n)).join('');
   });
   def('MID', 3, 3, function (nodes, ctx) {
-    const a = this.args(nodes, ctx, ['s', 'n', 'n']); if (isErr(a)) return a;
+    const a = this.args(nodes, ctx, ['s', 'n', 'n'], undefined, [null, lenCheck, lenCheck]); if (isErr(a)) return a;
     const st = Math.trunc(a[1]), n = Math.trunc(a[2]);
-    if (st < 1 || a[2] < 0 || st > INT32 || n > INT32) return E.IARG;
+    if (st < 1) return E.IARG;
     return codePoints(a[0]).slice(st - 1, st - 1 + n).join('');
   });
   def('LEN', 1, 1, function (nodes, ctx) {
