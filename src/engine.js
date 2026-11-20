@@ -3109,8 +3109,8 @@
     if (row > tgt.rows || col > tgt.cols) return E.REF;
     if (tgt instanceof Matrix) {
       this.retLost = true;
-      // an empty element comes out as empty text
-      const el = (x) => (x === null ? '' : x);
+      // an empty element comes out as empty text; booleans lose their format
+      const el = (x) => (x === null ? '' : typeof x === 'boolean' ? +x : x);
       if (row === 0 && col === 0) return tgt;
       if (row === 0) return new Matrix(tgt.data.map((r) => [el(r[col - 1])]));
       if (col === 0) return new Matrix([tgt.data[row - 1].map(el)]);
