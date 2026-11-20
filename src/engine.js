@@ -1020,10 +1020,22 @@
         if (v instanceof Matrix) parts.push(nums); // placeholder, fixed below
         if (v instanceof Range) {
           let err = null, col = -1, cur = null;
+          // opts.colLastErr (SUM): Calc sums a column block by block (a run of
+          // formula cells, booleans and error constants being one block); the
+          // first error of a block stops it, a later block's error replaces
+          // it, and the column's error ends the scan.
+          let prevR = -2, prevF = false, blockErr = false;
           this.eachCell(v, (x, r, c) => {
-            if (c !== col) { col = c; cur = []; parts.push(cur); }
+            if (c !== col) { if (err) return false; col = c; cur = []; parts.push(cur); prevR = -2; }
+            if (opts.colLastErr) {
+              const cell = v.sheet.cells.get(r * MAXCOL + c);
+              const f = !!cell && (cell.formula || typeof cell.raw === 'boolean' || (cell.raw !== null && typeof cell.raw === 'object'));
+              if (!(f && prevF && prevR === r - 1)) blockErr = false;
+              prevF = f; prevR = r;
+              if (blockErr) return true;
+            }
             if (typeof x === 'number') { nums.push(x); cur.push(x); } else if (typeof x === 'boolean') { nums.push(x ? 1 : 0); cur.push(x ? 1 : 0); }
-            else if (isErr(x) && !opts.skipErrors) { err = x; return false; }
+            else if (isErr(x) && !opts.skipErrors) { err = x; blockErr = true; return !!opts.colLastErr; }
             return true;
           });
           if (err) return { err };
@@ -1371,7 +1383,9 @@
   // its own (first cell first) and its total added as one term
   const popOrder = (parts) => [].concat(...parts.map((p) => (Array.isArray(p) ? p : [p])));
   const sumParts = (parts) => kahan(parts.map((p) => (Array.isArray(p) ? sumArray(p) : p)));
-  aggregate('SUM', (n, b, parts) => finite(sumParts(parts)));
+  // SUM scans a range column by column: the first column holding an error
+  // reports the last error in that column (Calc's per-column sum)
+  aggregate('SUM', (n, b, parts) => finite(sumParts(parts)), { colLastErr: true });
   // AVERAGE adds every value to one Kahan sum (no per-column sums)
   aggregate('AVERAGE', (n, b, parts) => (n.length ? finite(kahan(popOrder(parts)) / n.length) : E.DIV0));
   const asFmt = (x, b) => (b && (x === 0 || x === 1) ? x === 1 : x);
