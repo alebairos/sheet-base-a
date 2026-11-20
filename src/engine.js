@@ -877,9 +877,9 @@
       const own = ctx && v.ranges.find((x) => x.sheet === ctx.sheet);
       // (no cell: a conversion error, not a pending one)
       if (!own) return EREF['#VALUE!'];
-      if (own.c1 === own.c2 && ctx.r >= own.r1 && ctx.r <= own.r2) return this.cellValue(own.sheet, ctx.r, own.c1);
-      if (own.r1 === own.r2 && ctx.c >= own.c1 && ctx.c <= own.c2) return this.cellValue(own.sheet, own.r1, ctx.c);
-      if (ctx.r >= own.r1 && ctx.r <= own.r2 && ctx.c >= own.c1 && ctx.c <= own.c2) return this.cellValue(own.sheet, ctx.r, ctx.c);
+      if (own.c1 === own.c2 && ctx.r >= own.r1 && ctx.r <= own.r2) return asRefErr(this.cellValue(own.sheet, ctx.r, own.c1));
+      if (own.r1 === own.r2 && ctx.c >= own.c1 && ctx.c <= own.c2) return asRefErr(this.cellValue(own.sheet, own.r1, ctx.c));
+      if (ctx.r >= own.r1 && ctx.r <= own.r2 && ctx.c >= own.c1 && ctx.c <= own.c2) return asRefErr(this.cellValue(own.sheet, ctx.r, ctx.c));
       return EREF['#VALUE!'];
     }
 
@@ -947,18 +947,32 @@
       if (!this.lineCache) this.lineCache = new Map();
       const hit = this.lineCache.get(key);
       if (hit) return hit;
-      const out = [];
+      const n = byRow ? c2 - v.c1 + 1 : r2 - v.r1 + 1;
+      const pos = (i) => (byRow ? [v.r1, v.c1 + i] : [v.r1 + i, v.c1]);
+      const cellAt = (i) => { const [r, c] = pos(i); return v.sheet.cells.get(r * MAXCOL + c); };
+      const get = (i) => { const [r, c] = pos(i); const x = this.cellValue(v.sheet, r, c); return x === EMPTYR ? 0 : x; };
       let final = true;
-      const get = (r, c) => {
-        const cell = v.sheet.cells.get(r * MAXCOL + c);
-        if (cell && cell.state === 1) final = false;
-        const x = this.cellValue(v.sheet, r, c);
-        return x === EMPTYR ? 0 : x;
-      };
-      if (byRow) for (let c = v.c1; c <= c2; c++) out.push(get(v.r1, c));
-      else for (let r = v.r1; r <= r2; r++) out.push(get(r, v.c1));
-      if (final) this.lineCache.set(key, out);
-      return out;
+      for (let i = 0; i < n && final; i++) { const cell = cellAt(i); if (cell && cell.state !== 2 && cell.ast) final = false; }
+      if (final) {
+        const out = [];
+        for (let i = 0; i < n; i++) out.push(get(i));
+        this.lineCache.set(key, out);
+        return out;
+      }
+      // cells still to compute are read only when the search reaches them
+      // (Calc computes only the cells a lookup probes, so a lookup over a
+      // range holding its own cell need not be circular)
+      const UNREAD = {}, vals = new Array(n).fill(UNREAD);
+      const at = (i) => (vals[i] === UNREAD ? (vals[i] = get(i)) : vals[i]);
+      // a cell with nothing in it, told without computing anything
+      const blankAt = (i) => { const cell = cellAt(i); return !cell || (!cell.ast && !cell.parseError && cell.value === null); };
+      return new Proxy(vals, {
+        get(t, k) {
+          if (k === 'blankAt') return blankAt;
+          if (typeof k === 'string' && /^\d+$/.test(k)) return +k < n ? at(+k) : undefined;
+          return Reflect.get(t, k);
+        },
+      });
     }
 
     // cells of a range/matrix as a 2D array (clamped to used area for ranges)
@@ -1053,7 +1067,16 @@
           const cmpOp = op === '=' || op === '<>' || op === '<' || op === '>' || op === '<=' || op === '>=';
           // comparing an array with an error gives that error, not an array
           if (cmpOp) { const e = [a, b].find((v) => !(v instanceof Matrix) && isErr(v)); if (e) return e.lit ? errByCode(e.code) : e; }
-          return jmOf(this.amap([a, b], (x, y) => asComputed(this.binop({ op, a: lit(x), b: lit(y) }, ctx)), cmpOp), [a, b]);
+          // Calc's matrix division checks the divisor first: a zero divisor
+          // is #DIV/0! whatever the dividend (an error, or text beside a
+          // scalar divisor); an error to the power 0 is 1
+          const bothMat = a instanceof Matrix && b instanceof Matrix;
+          const zero = (y) => y === 0 || y === false || y === null || y === EMPTYR || isLB(y);
+          return jmOf(this.amap([a, b], (x, y) => {
+            if (op === '/' && zero(y) && (isErr(x) || (!bothMat && typeof x === 'string'))) return E.DIV0;
+            if (op === '^' && bothMat && zero(y) && isErr(x)) return 1;
+            return asComputed(this.binop({ op, a: lit(x), b: lit(y) }, ctx));
+          }, cmpOp), [a, b]);
         }
         case 'fn': {
           const name = node.name;
@@ -1116,7 +1139,9 @@
             if (!args.some((m) => m instanceof Matrix)) return mark(this.ev0(node, ctx));
             return mark(this.amap(args, (...xs) => {
               const a2 = node.args.slice();
-              mp.forEach((i, k) => { if (args[k] !== null) a2[i] = lit(xs[k]); });
+              // (an error element of a lookup value is an operand, not a pending
+              // error: checked after the column/row index, as a cell's error)
+              mp.forEach((i, k) => { if (args[k] !== null) a2[i] = lit(LOOKUPS.has(name) && i === 0 ? asRefErr(xs[k]) : xs[k]); });
               const pos = this.amPos;
               const r = this.call({ t: 'fn', name, args: a2 }, ctx);
               if (r instanceof Range) {
@@ -1156,7 +1181,12 @@
             return mark(this.amap(args, (x) => (isErr(x) || (typeof x === 'string' && textToNum(x) === null) ? 0 : asComputed(this.call({ t: 'fn', name, args: [lit(x)] }, ctx)))));
           }
           // as large as the largest argument, #VALUE! where one lacks the position
-          return mark(this.amap(args, (...xs) => asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx)), name !== 'POWER'));
+          // (Calc's MOD pops the divisor first: 0 is #DIV/0! whatever the dividend)
+          const div0 = name === 'MOD' && args.length === 2;
+          return mark(this.amap(args, (...xs) => {
+            if (div0 && isErr(xs[0]) && (xs[1] === 0 || xs[1] === false || xs[1] === null || isLB(xs[1]))) return E.DIV0;
+            return asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx));
+          }, name !== 'POWER'));
         }
         default: return this.ev(node, ctx);
       }
@@ -1502,7 +1532,7 @@
           default: r = v;
         }
         if (isErr(r)) return tokBefore(vals, i, r);
-        if (checks && checks[i] && r !== undefined) { const e = checks[i](r); if (e) return e; }
+        if (checks && checks[i] && r !== undefined) { const e = checks[i](r); if (e) return checks.soft ? tokBefore(vals, i, e) : e; }
         out[i] = r;
       }
       return out;
@@ -1771,7 +1801,20 @@
   function sortedLookup(list0, q, asc, binary) {
     // an error cell is a non-text cell that never satisfies the condition
     const ERRC = { err: true };
-    const list = list0.map((x) => x === null ? null : isErr(x) ? ERRC : x === EMPTYR ? '' : typeof x === 'boolean' ? +x : x);
+    const conv = (x) => (x === null ? null : isErr(x) ? ERRC : x === EMPTYR ? '' : typeof x === 'boolean' ? +x : x);
+    // (cells are read as the search reaches them; blanks are told apart
+    // without reading)
+    const memo = new Map();
+    const list = new Proxy([], {
+      get(t, k) {
+        if (typeof k === 'string' && /^\d+$/.test(k)) {
+          if (!memo.has(k)) memo.set(k, +k < list0.length ? conv(list0[k]) : undefined);
+          return memo.get(k);
+        }
+        return k === 'length' ? list0.length : Reflect.get(t, k);
+      },
+    });
+    const isNull = (i) => (list0.blankAt ? list0.blankAt(i) : list[i] === null);
     const n = list.length, byStr = typeof q === 'string';
     const isStr = (x) => typeof x === 'string';
     const cmp = (c) => (byStr ? strCmp(c, q) : c === ERRC ? (approxEqual(0, q) ? 0 : 0 < q ? -1 : 1) : (approxEqual(c, q) ? 0 : c < q ? -1 : 1));
@@ -1781,12 +1824,12 @@
       const t = cmp(list[0]);
       if ((asc && t > 0) || (!asc && t < 0)) { row++; skipped = true; }
     }
-    while (row < n && list[row] === null) row++;
+    while (row < n && isNull(row)) row++;
     if (allStringIgnore) while (row < n && (list[row] === null || isStr(list[row]))) row++;
     let start = row;
     if (binary && row < n) {
       const idx = [];
-      for (let i = row; i < n; i++) if (list[i] !== null) idx.push(i);
+      for (let i = row; i < n; i++) if (!isNull(i)) idx.push(i);
       let lo = 0, hi = idx.length - 1, last = 0, found = null, done = false, broken = false;
       let lastV = asc ? -Infinity : Infinity, lastS = asc ? '' : '￿';
       if (isStr(list[idx[0]])) lastS = list[idx[0]]; else lastV = list[idx[0]] === ERRC ? 0 : list[idx[0]];
@@ -2362,8 +2405,10 @@
     const cps = codePoints(a[0]);
     return n === 0 ? '' : cps.slice(Math.max(0, cps.length - n)).join('');
   });
+  const MID_CHECKS = Object.assign([null, lenCheck, lenCheck], { soft: true });
   def('MID', 3, 3, function (nodes, ctx) {
-    const a = this.args(nodes, ctx, ['s', 'n', 'n'], undefined, [null, lenCheck, lenCheck]); if (isErr(a)) return a;
+    // (MID pops its text after the position errors: an error token there wins)
+    const a = this.args(nodes, ctx, ['s', 'n', 'n'], undefined, MID_CHECKS); if (isErr(a)) return a;
     const st = Math.trunc(a[1]), n = Math.trunc(a[2]);
     if (st < 1) return E.IARG;
     if (st >= 2 ** 28 || n >= 2 ** 28) return E.STROVF; // beyond the longest string
@@ -2667,6 +2712,7 @@
   const CLEARS_ERROR = new Set(['IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISERR', 'ISNA', 'ISLOGICAL',
     'ISNONTEXT', 'ISREF', 'COUNT', 'COUNTA', 'N']);
   // parameters that take one value: an array there gives one result per element
+  const LOOKUPS = new Set(['VLOOKUP', 'HLOOKUP', 'MATCH']);
   const MAPPED_PARAMS = { COUNTIF: [1], SUMIF: [1], AVERAGEIF: [1], VLOOKUP: [0], HLOOKUP: [0], MATCH: [0], INDEX: [1, 2] };
   const ELEMENTWISE = new Set(['IF', 'IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISNA', 'ISERR', 'ISLOGICAL',
     'ISNONTEXT', 'LEN', 'ABS', 'ROUND', 'ROUNDUP', 'ROUNDDOWN', 'INT', 'TRUNC', 'SIGN', 'NOT', 'UPPER', 'LOWER', 'LEFT',
