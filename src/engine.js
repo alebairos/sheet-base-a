@@ -1043,7 +1043,7 @@
     scalar(v, ctx) {
       if (v instanceof Range) return this.intersect(v, ctx);
       if (v instanceof Matrix) return m00(v);
-      if (v instanceof RefList) return v.is3d ? this.own3d(v, ctx) : E.IARG;
+      if (v instanceof RefList) return v.is3d ? this.own3d(v, ctx) : asRefErr(E.IARG); // (as a conversion error: an error popped later still wins)
       return v;
     }
     // a 3D reference in a scalar position: its range on the formula's own
