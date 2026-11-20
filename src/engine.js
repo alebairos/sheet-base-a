@@ -1555,7 +1555,10 @@
           // as large as the largest argument, #VALUE! where one lacks the position
           // (Calc's MOD pops the divisor first: 0 is #DIV/0! whatever the dividend)
           const div0 = name === 'MOD' && args.length === 2;
+          const isf = /^IS/.test(name);
           return mark(this.amap(args, (...xs) => {
+            // (the IS functions see an empty-path element as empty text)
+            if (isf) xs = xs.map((x) => (x === EPATH ? '' : x));
             if (div0 && isErr(xs[0]) && (xs[1] === 0 || xs[1] === false || xs[1] === null || isLB(xs[1]))) return E.DIV0;
             return asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx));
           }, name !== 'POWER'));
@@ -3566,7 +3569,10 @@
     if (isErr(v)) return v;
     if (rg instanceof RefList) return E.VALUE;
     if (v === null) v = ''; else if (isLB(v) || v === EMPTYR || isMV(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
-    const list = this.firstLine(rg, rg.cols !== 1);
+    let list = this.firstLine(rg, rg.cols !== 1);
+    // (an array IF's empty-path element is not empty to Calc's matrix search:
+    // it compares as empty text)
+    if (rg instanceof Matrix && rg.epm) { const f = rg.cols !== 1 ? rg.epm[0] : rg.epm.map((row) => row[0]); list = list.map((x, k) => (f[k] ? '' : x)); }
     const i = lookupPos(list, v, mode, rg instanceof Range ? (rg.cols === 1 ? 'col' : 'row') : null, true);
     return i < 0 ? E.NA : i + 1;
   });
