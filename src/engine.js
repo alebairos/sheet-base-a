@@ -2193,8 +2193,7 @@
       if (nodes[2].t === 'missing') return E.PARAM;
       if (isErr(s) || !(s instanceof Range || s instanceof Matrix)) return E.VALUE;
     }
-    const critErr = isErr(crit) && crit.tok ? crit : null;
-    if (isErr(rg)) return count ? rg : critErr || E.VALUE;
+    if (isErr(rg)) return count ? rg : isErr(crit) ? crit : E.VALUE;
     // (a criterion read from an error cell is popped first: its error wins)
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return isErr(crit) ? crit : E.PARAM;
     if (crit === MISSING || isLB(crit)) crit = null;
@@ -2208,6 +2207,7 @@
         if (!(s instanceof Matrix)) return E.VALUE;
         return { rg, match, sum: s };
       }
+      if (s instanceof Matrix) return { rg, match, sum: s };
       if (!(s instanceof Range)) return E.VALUE;
       sum = new Range(s.sheet, s.r1, s.c1, s.r1 + rg.rows - 1, s.c1 + rg.cols - 1);
     }
@@ -2229,7 +2229,9 @@
     const blankMatches = a.match(null);
     const visit = (v, r, c) => {
       if (!a.match(v)) return true;
-      let sv = self.cellValue(a.sum.sheet, a.sum.r1 + (r - a.rg.r1), a.sum.c1 + (c - a.rg.c1));
+      // (an inline array as the sum range: the element at the same position, if any)
+      let sv = a.sum instanceof Matrix ? (a.sum.data[r - a.rg.r1] ? a.sum.data[r - a.rg.r1][c - a.rg.c1] : undefined)
+        : self.cellValue(a.sum.sheet, a.sum.r1 + (r - a.rg.r1), a.sum.c1 + (c - a.rg.c1));
       if (sv === EMPTYR) sv = 0;
       if (typeof sv === 'number') nums.push(sv);
       else if (typeof sv === 'boolean') nums.push(sv ? 1 : 0);
@@ -2860,9 +2862,10 @@
     // the match type is truncated: -1, 0 or 1, anything else is a parameter error
     const mode = Math.trunc(rest[0]);
     if (mode < -1 || mode > 1) return E.PARAM;
+    // (a lookup array that is neither a reference nor an array: before a cell's error)
+    if (!(rg instanceof Range) && !(rg instanceof Matrix) && !(rg instanceof RefList)) return E.VALUE;
     if (isErr(v)) return v;
     if (rg instanceof RefList) return E.VALUE;
-    if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.NA;
     if (rg.rows !== 1 && rg.cols !== 1) return E.PARAM;
     if (v === null) v = ''; else if (isLB(v) || v === EMPTYR) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const list = this.firstLine(rg, rg.cols !== 1);
@@ -2877,6 +2880,7 @@
     // Calc reads the row and area as 32-bit, the column as 16-bit integers
     if (Math.trunc(a[0]) > INT32 || Math.trunc(a[1]) > 32767 || Math.trunc(a[2]) > INT32) return E.IARG;
     // an error constant as the reference: after the other parameters and the area
+    if (isErr(ref) && (a[0] < 0 || a[1] < 0)) return E.IARG;
     if (isErr(ref)) return Math.trunc(a[2]) !== 1 ? (a[2] < 1 ? E.IARG : E.REF) : ref;
     let row = Math.trunc(a[0]);
     let col = a[1] === undefined ? undefined : Math.trunc(a[1]);
