@@ -300,9 +300,20 @@
         i += lit.length;
         continue;
       }
-      // sheet-qualified reference
-      let sheet = null;
+      // sheet-qualified reference (sheet2: a 3D range Sheet1:Sheet3!A1)
+      let sheet = null, sheet2 = null;
       let j = i;
+      {
+        const nm = "(?:'((?:[^']|'')+)'|([A-Za-z_\u00C0-\uFFFF][\\w.\u00C0-\uFFFF]*))";
+        const m3 = new RegExp('^' + nm + ':' + nm + '!').exec(src.slice(i));
+        if (m3) {
+          const un = (q, b) => (q !== undefined ? q.replace(/''/g, "'") : b);
+          sheet = un(m3[1], m3[2]); sheet2 = un(m3[3], m3[4]);
+          const rest3 = src.slice(i + m3[0].length);
+          if (!/^\$?[A-Za-z]{1,3}\$?\d/.test(rest3)) { sheet = null; sheet2 = null; } else j = i + m3[0].length;
+        }
+      }
+      if (sheet2 !== null) { /* already parsed */ } else
       if (ch === "'") {
         let s = '';
         j++;
@@ -324,7 +335,7 @@
           const a = parseAddr(m[1]);
           const b = m[2] ? parseAddr(m[2]) : null;
           if (a && (!m[2] || b)) {
-            pushTok({ t: 'ref', sheet, a, b, text: src.slice(i, j + m[0].length) });
+            pushTok({ t: 'ref', sheet, sheet2, a, b, text: src.slice(i, j + m[0].length) });
             i = j + m[0].length;
             continue;
           }
@@ -485,7 +496,7 @@
         case 'num': return { t: 'num', v: t.v };
         case 'str': return { t: 'str', v: t.v };
         case 'err': return { t: 'errlit', v: errByCode(t.v) };
-        case 'ref': return { t: 'ref', sheet: t.sheet, a: t.a, b: t.b };
+        case 'ref': return t.sheet2 ? { t: 'ref3d', sheet: t.sheet, sheet2: t.sheet2, a: t.a, b: t.b } : { t: 'ref', sheet: t.sheet, a: t.a, b: t.b };
         case 'name': {
           if (isOp('(')) { p++; return { t: 'fn', name: t.v.toUpperCase().replace(/^_XLFN\./, ''), args: args() }; }
           const u = t.v.toUpperCase();
@@ -773,9 +784,24 @@
         case 'name': return E.NAME;
         case 'ref': {
           const sh = this.resolveSheet(node.sheet, ctx);
-          if (!sh) return E.NAME;
+          if (!sh) {
+            // 'Sheet1:Sheet3'!A1 (one quoted name) is a 3D reference
+            const k = node.sheet ? node.sheet.indexOf(':') : -1;
+            if (k > 0) return this.ev({ t: 'ref3d', sheet: node.sheet.slice(0, k), sheet2: node.sheet.slice(k + 1), a: node.a, b: node.b }, ctx);
+            return E.NAME;
+          }
           const b = node.b || node.a;
           return new Range(sh, node.a.r, node.a.c, b.r, b.c);
+        }
+        case 'ref3d': {
+          const s1 = this.wb.sheet(node.sheet), s2 = this.wb.sheet(node.sheet2);
+          if (!s1 || !s2) return E.NAME;
+          let i1 = this.wb.sheets.indexOf(s1), i2 = this.wb.sheets.indexOf(s2);
+          if (i1 > i2) [i1, i2] = [i2, i1];
+          const b = node.b || node.a;
+          const ranges = [];
+          for (let k = i1; k <= i2; k++) ranges.push(new Range(this.wb.sheets[k], node.a.r, node.a.c, b.r, b.c));
+          return ranges.length === 1 ? ranges[0] : new RefList(ranges);
         }
         case 'isect': {
           const a = this.ev(node.a, ctx), b = this.ev(node.b, ctx);
@@ -2213,8 +2239,20 @@
     const add = (x) => { if (x && x.formula && !seen.has(x)) { seen.add(x); out.push(x); } };
     const walk = (node) => {
       if (!node || typeof node !== 'object') return;
+      if (node.t === 'ref3d') {
+        const s1 = eng.wb.sheet(node.sheet), s2 = eng.wb.sheet(node.sheet2);
+        if (!s1 || !s2) return;
+        const i1 = eng.wb.sheets.indexOf(s1), i2 = eng.wb.sheets.indexOf(s2);
+        for (let k = Math.min(i1, i2); k <= Math.max(i1, i2); k++) walk({ t: 'ref', sheet: eng.wb.sheets[k].name, a: node.a, b: node.b });
+        return;
+      }
       if (node.t === 'ref') {
         const s = node.sheet === null ? cell.sheet : eng.wb.sheet(node.sheet);
+        if (!s && node.sheet && node.sheet.indexOf(':') > 0) {
+          const k = node.sheet.indexOf(':');
+          walk({ t: 'ref3d', sheet: node.sheet.slice(0, k), sheet2: node.sheet.slice(k + 1), a: node.a, b: node.b });
+          return;
+        }
         if (!s) return;
         const b = node.b || node.a;
         const r1 = Math.min(node.a.r, b.r), r2 = Math.min(Math.max(node.a.r, b.r), s.maxR);
