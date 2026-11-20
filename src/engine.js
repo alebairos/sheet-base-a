@@ -2369,10 +2369,10 @@
       if ((asc && c <= 0) || (!asc && c >= 0)) return hit;
     }
     if (hit <= 0) return -1;
-    // (a hit before the last element must be of the query's type: text for a
-    // text query, not text for a number)
+    // (a hit before the last element must be of the query's type: text or
+    // empty for a text query, a value (not empty) for a number)
     const x = list[hit - 1];
-    return (typeof x === 'string') === byStr ? hit - 1 : -1;
+    return (byStr ? typeof x === 'string' || empty(x) : typeof x !== 'string' && !empty(x)) ? hit - 1 : -1;
   }
   // Calc's sorted VLOOKUP/HLOOKUP over an array: a walk that keeps the last
   // element not above the query and stops at the first one above it (for a
@@ -3549,7 +3549,7 @@
   });
   def('MATCH', 2, 3, function (nodes, ctx) {
     let v = this.sv(nodes[0], ctx);
-    if (v === MISSING) v = 0;
+    if (v === MISSING) v = 0; else if (v === EPATH) v = ''; // (an empty-path element looks for empty text)
     const clr0 = this.clr;
     const pend0 = this.pend;
     const rg = this.fev(nodes[1], ctx);
