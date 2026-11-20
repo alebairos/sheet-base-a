@@ -2433,7 +2433,9 @@
       if (Array.isArray(p) && p.segs) {
         const C = { sum: 0, err: 0, mem: 0 };
         for (const sg of p.segs) { if (Array.isArray(sg)) kahanAdd(C, kahanGet(sumState(sg))); else kahanAdd(C, sg); }
-        kahanAdd(T, kahanGet(C));
+        // (a column holding formula cells ends with its held-back term added
+        // plainly to sum + error, not compensated: SUM of =2^52, =1/3, =0.3 is 2^52)
+        kahanAdd(T, C.mem === 0 ? C.sum + C.err : approxAdd(C.sum + C.err, C.mem));
       } else { flush(); if (Array.isArray(p)) kahanAdd(T, sumArray(p)); else kahanAdd(T, p); }
     }
     flush();
