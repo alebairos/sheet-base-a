@@ -1,0 +1,22 @@
+# MIN/MAX over arrays of empty elements, comparisons of error constants with arrays, INDEX over an array of positions reaching blank cells
+=MIN(C4:C6,{})
+=MIN({})
+=MIN(5,{1,,2})
+=MIN({1,,2})
+=MAX(-5,{})
+=MAX({-1,,-2})
+=AVERAGE({1,,2})
+=COUNT({1,,2})
+=PRODUCT({1,,2})
+=MEDIAN({1,,3})
+=STDEV({1,,3})
+=SUM({1,,2})
+=MIN(IF({1,0},5))
+=MAX(IF({1,0},-5))
+=MIN(5,IF({1,1;1,1},A1:B2))
+=MATCH(#DIV/0!<{1;-2;"x"},A3:A7,-1)
+=MATCH(#N/A={1,2},A1:A3,0)
+=VLOOKUP({1,"a"},A1:B12,2,FALSE)&"x"
+=VLOOKUP({4,"a"},A4:B12,2,FALSE)&"x"
+=VLOOKUP({11,"a"},A11:B12,2,FALSE)&"x"
+=INDEX(A1:B12,{11,1},2)&"x"

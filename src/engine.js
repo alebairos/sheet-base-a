@@ -1035,7 +1035,7 @@
           }
           const cmpOp = op === '=' || op === '<>' || op === '<' || op === '>' || op === '<=' || op === '>=';
           // comparing an array with an error gives that error, not an array
-          if (cmpOp) { const e = [a, b].find((v) => !(v instanceof Matrix) && isErr(v)); if (e) return e; }
+          if (cmpOp) { const e = [a, b].find((v) => !(v instanceof Matrix) && isErr(v)); if (e) return e.lit ? errByCode(e.code) : e; }
           return jmOf(this.amap([a, b], (x, y) => asComputed(this.binop({ op, a: lit(x), b: lit(y) }, ctx)), cmpOp), [a, b]);
         }
         case 'fn': {
@@ -1107,7 +1107,7 @@
                 const rr = r.rows === 1 ? 0 : pos[0], cc = r.cols === 1 ? 0 : pos[1];
                 if (rr >= r.rows || cc >= r.cols) return E.NA;
                 const x = this.cellValue(r.sheet, r.r1 + rr, r.c1 + cc);
-                return asComputed(x === null || x === EMPTYR ? 0 : x);
+                return asComputed(x === EMPTYR ? '' : x);
               }
               return asComputed(r instanceof Matrix ? r.data[0][0] : r);
             }));
@@ -1553,6 +1553,8 @@
           // (MIN/MAX: an array holding an error, other than the first
           // parameter, is passed over whole, as Calc's matrix minimum is NaN)
           if (opts.arrErrSkip && k > 0 && v.data.some((row) => row.some(isErr))) continue;
+          // (and an array of empty elements only counts as 0)
+          if (opts.arrErrSkip && v.data.every((row) => row.every((x) => x === null))) { nums.push(0); continue; }
           for (const row of v.data) for (const x of row) {
             if (typeof x === 'number') { nums.push(x); } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
             else if (isErr(x) && !opts.skipErrors) return { err: x };
