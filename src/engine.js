@@ -2294,9 +2294,11 @@
     return n.length ? kahan(n) / n.length : E.DIV0;
   });
   def('HLOOKUP', 3, 4, function (nodes, ctx) {
-    const v = this.sv(nodes[0], ctx);
+    let v = this.sv(nodes[0], ctx);
+    const clr0 = this.clr;
     const tbl = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
+    if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
     if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
     if (isErr(tbl)) return tbl;
     if (isErr(rest)) return rest;
@@ -2316,9 +2318,11 @@
 
   // ---- lookup
   def('VLOOKUP', 3, 4, function (nodes, ctx) {
-    const v = this.sv(nodes[0], ctx);
+    let v = this.sv(nodes[0], ctx);
+    const clr0 = this.clr;
     const tbl = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
+    if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
     if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
     if (isErr(tbl)) return tbl;
     if (isErr(rest)) return rest;
@@ -2339,8 +2343,10 @@
   def('MATCH', 2, 3, function (nodes, ctx) {
     let v = this.sv(nodes[0], ctx);
     if (v === MISSING) v = 0;
+    const clr0 = this.clr;
     const rg = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n'], [1]);
+    if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
     if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
     if (isErr(rg)) return rg;
     if (rg === MISSING) return E.PARAM;
