@@ -2728,6 +2728,8 @@
     if (isErr(ref) && !ref.lit) return ref;
     const a = this.args(nodes.slice(1), ctx, ['n', 'n', 'n'], [0, undefined, 1]);
     if (isErr(a)) return a;
+    // Calc reads the row and area as 32-bit, the column as 16-bit integers
+    if (Math.trunc(a[0]) > INT32 || Math.trunc(a[1]) > 32767 || Math.trunc(a[2]) > INT32) return E.IARG;
     // an error constant as the reference: after the other parameters and the area
     if (isErr(ref)) return Math.trunc(a[2]) !== 1 ? (a[2] < 1 ? E.IARG : E.REF) : ref;
     let row = Math.trunc(a[0]);
