@@ -2327,14 +2327,28 @@
     if (byStr && hit >= 0 && !hitStr) return -1;
     return hit;
   }
+  // a descending search with a pattern no cell matches: a walk comparing it
+  // as plain text, from the first cell not below it while cells stay so
+  // (text below it at the start is passed over, anything else ends the walk)
+  function wildDescWalk(list, v) {
+    let found = -1;
+    for (let i = 0; i < list.length; i++) {
+      let x = list[i];
+      if (x === null || x === undefined) continue;
+      if (x === EMPTYR) x = '';
+      if (typeof x === 'string' && strCmp(x, v) >= 0) found = i;
+      else if (found >= 0 || typeof x !== 'string') break; // (a cell not text before any: no match)
+    }
+    return found;
+  }
   function lookupPos(list, v, mode, ranges, numsBelowText) {
     if (typeof v === 'boolean') v = v ? 1 : 0;
     // an ascending wildcard search over cells: the first cell the pattern
     // matches (and the matching cells right after it); without one, a sorted
     // search comparing the pattern as plain text
-    if (mode > 0 && typeof v === 'string' && hasWild(v) && (ranges === 'col' || ranges === 'row')) {
+    if (mode !== 0 && typeof v === 'string' && hasWild(v) && (ranges === 'col' || ranges === 'row')) {
       let i = list.findIndex((x) => lookupEq(v, x, false));
-      if (i < 0) return sortedLookup(list, v, true, ranges === 'col');
+      if (i < 0) return mode > 0 ? sortedLookup(list, v, true, ranges === 'col') : wildDescWalk(list, v);
       while (i + 1 < list.length && lookupEq(v, list[i + 1], false)) i++;
       return i;
     }
