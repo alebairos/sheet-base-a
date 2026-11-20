@@ -481,6 +481,18 @@
     while (i < n) {
       const ch = src[i];
       if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') { i++; continue; }
+      // (an inline array holding anything but constants fails the whole
+      // formula, before other syntax errors: #N/A)
+      if (ch === '{') {
+        let j = i + 1, inStr = false;
+        while (j < n && (inStr || src[j] !== '}')) { if (src[j] === '"') inStr = !inStr; else if (!inStr && src[j] === '{') break; j++; }
+        if (j < n && src[j] === '}') {
+          const body = src.slice(i + 1, j);
+          const elems = body.match(/("(?:[^"]|"")*"|[^,;"]+)*|[,;]/g) ? body.split(/[,;](?=(?:[^"]*"[^"]*")*[^"]*$)/) : [body];
+          const okEl = (e) => /^\s*(?:[+-]?\s*(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?%?|"(?:[^"]|"")*"|TRUE|FALSE|)\s*$/i.test(e);
+          if (!elems.every(okEl)) fail0('bad inline array', '#N/A');
+        }
+      }
       // (an inline array opened inside another fails the whole formula: #N/A)
       if (ch === '{' && toks.some((t) => t.t === 'op' && t.v === '{') && toks.filter((t) => t.t === 'op' && t.v === '{').length > toks.filter((t) => t.t === 'op' && t.v === '}').length) fail0('nested array', '#N/A');
       if (ch === '"') {
@@ -783,6 +795,7 @@
         rows[rows.length - 1].push(v);
         if (isOp(',')) { p++; continue; }
         if (isOp(';')) { p++; rows.push([]); continue; }
+        if (toks[p].t === 'eof' && v !== null) break; // (an array left open after a value is closed, as Calc does)
         if (!isOp('}')) bad();
         p++;
         break;
@@ -1287,7 +1300,18 @@
           // scalar divisor); an error to the power 0 and 1 to an error are 1
           const bothMat = a instanceof Matrix && b instanceof Matrix;
           const zero = (y) => y === 0 || y === false || y === null || y === EMPTYR || isLB(y);
+          // (array and scalar with + - *: Calc computes element op scalar
+          // (scalar - element for a scalar first), so the first operand's
+          // error, a text's #VALUE! too, wins: SUMPRODUCT(B8:B12*A12) with
+          // text in B8:B12 and #DIV/0! in A12 is #VALUE!)
+          const arith = !bothMat && (op === '+' || op === '-' || op === '*');
+          const convE = (v) => (isErr(v) ? v : typeof v === 'string' ? (isErr(this.toNum(v)) ? E.VALUE : null) : null);
           return jmOf(this.amap([a, b], (x, y) => {
+            if (arith) {
+              const [m, sv] = a instanceof Matrix ? [x, y] : [y, x];
+              const em = convE(m), es = convE(sv);
+              if (em && es) return asComputed(op === '-' && !(a instanceof Matrix) ? es : em);
+            }
             if (op === '/' && zero(y) && (isErr(x) || (!bothMat && typeof x === 'string'))) return E.DIV0;
             if (op === '^' && bothMat && ((zero(y) && isErr(x)) || ((x === 1 || x === true) && isErr(y)))) return 1;
             return asComputed(this.binop({ op, a: lit(x), b: lit(y) }, ctx));
@@ -1306,7 +1330,10 @@
             if (name === 'IFERROR' && !sc && node.args[0].t !== 'missing') {
               // (in an array context IFERROR gives a reference without errors back as it is)
               const raw = this.aev1(node.args[0], ctx, sc);
-              if (raw instanceof Range) {
+              let u0 = node.args[0]; while (u0.t === 'paren') u0 = u0.a;
+              // (a single cell reference stays a scalar: no array IFERROR)
+              if (raw instanceof Range && u0.t === 'ref' && !u0.b) first = this.aevPost(raw, ctx, true);
+              else if (raw instanceof Range) {
                 const m = this.rangeMatrix(raw);
                 if (!m.data.some((row) => row.some(isErr))) { this.clr++; return raw; } // (IFERROR ran: no pending error)
                 first = this.aevPost(m, ctx, sc);
@@ -2733,8 +2760,13 @@
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return isErr(crit) ? crit : E.PARAM;
     if (crit === MISSING || isLB(crit)) crit = null;
     if (crit === EMPTYR || isMV(crit)) crit = 0;
-    const match = makeCriterion(crit);
+    let match = makeCriterion(crit);
     if (isErr(match)) return match;
+    // (over an array a pattern, or "<>" for not empty, never matches a number)
+    if (!(rg instanceof Range) && typeof crit === 'string' && (crit === '<>' || (!/^[<>=]/.test(crit) && hasWild(crit)))) {
+      const m0 = match;
+      match = (v) => typeof v !== 'number' && typeof v !== 'boolean' && m0(v);
+    }
     let sum = rg;
     if (nodes.length > 2) {
       if (rg instanceof Matrix) {
@@ -2755,7 +2787,8 @@
     let err = null;
     if (a.rg instanceof Matrix) {
       a.rg.data.forEach((row, r) => row.forEach((v, c) => {
-        if (err || !a.match(v)) return;
+        // (an error element of a computed array matches any criterion)
+        if (err || !(isErr(v) || a.match(v))) return;
         let sv = a.sum instanceof Matrix ? (a.sum.data[r] ? a.sum.data[r][c] : undefined)
           : self.cellValue(a.sum.sheet, a.sum.r1 + r, a.sum.c1 + c);
         if (sv === EMPTYR) sv = 0;
@@ -2796,7 +2829,7 @@
     let n = 0;
     const rg = a.rg;
     if (rg instanceof Matrix) {
-      for (const row of rg.data) for (const v of row) if (a.match(v)) n++;
+      for (const row of rg.data) for (const v of row) if (isErr(v) || a.match(v)) n++; // (error elements match any criterion)
       return n;
     }
     if (a.match(null)) {
@@ -3387,6 +3420,7 @@
   });
   def('HLOOKUP', 3, 4, function (nodes, ctx) {
     let v = this.sv(nodes[0], ctx);
+    if (v === MISSING) v = 0; // (an empty lookup value is 0)
     const clr0 = this.clr;
     const pend0 = this.pend;
     const tbl = this.fev(nodes[1], ctx);
@@ -3422,6 +3456,7 @@
   // ---- lookup
   def('VLOOKUP', 3, 4, function (nodes, ctx) {
     let v = this.sv(nodes[0], ctx);
+    if (v === MISSING) v = 0; // (an empty lookup value is 0)
     const clr0 = this.clr;
     const pend0 = this.pend;
     const tbl = this.fev(nodes[1], ctx);
