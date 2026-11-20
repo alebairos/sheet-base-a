@@ -3603,6 +3603,9 @@
       // an empty element comes out as empty text; booleans lose their format
       const el = (x) => (x === null ? '' : typeof x === 'boolean' ? +x : x);
       if (row === 0 && col === 0) return tgt;
+      // (one index into a one-row or one-column array: the element itself)
+      if (row === 0 && tgt.rows === 1) return el(tgt.data[0][col - 1]);
+      if (col === 0 && tgt.cols === 1) return el(tgt.data[row - 1][0]);
       if (row === 0) return new Matrix(tgt.data.map((r) => [el(r[col - 1])]));
       if (col === 0) return new Matrix([tgt.data[row - 1].map(el)]);
       return el(tgt.data[row - 1][col - 1]);
