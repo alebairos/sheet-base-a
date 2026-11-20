@@ -1770,6 +1770,18 @@
     const a = this.args(nodes, ctx, ['n', 'n'], [undefined, 0]); if (isErr(a)) return a;
     return roundTo(a[0], a[1], -1);
   });
+  // TEXT's General format: large numbers that need more than 15 digits are
+  // shown as d.dddddddddddddd E+nn
+  function fmtGeneral(x) {
+    if (typeof x !== 'number' || !isFinite(x)) return fmtNum(x);
+    const a = Math.abs(x);
+    if (a >= 1e15 && !(a < 1e16 && Number(a.toPrecision(15)) === a)) {
+      const [m, e] = x.toExponential(14).split('e');
+      const n = parseInt(e, 10);
+      return m + 'E' + (n < 0 ? '-' : '+') + String(Math.abs(n)).padStart(2, '0');
+    }
+    return fmtNum(x);
+  }
   // TEXT(value, format): number formats without dates (sections, 0 # ?,
   // thousands separators and scaling, %, exponents, quoted literals, @).
   function splitSections(fmt) {
@@ -1859,11 +1871,11 @@
       return ts === undefined ? v : ts.replace(/"([^"]*)"/g, '$1').replace(/@/g, v);
     }
     if (fmt === '') return '';
-    if (/^general$/i.test(fmt.trim())) return fmtNum(v);
+    if (/^general$/i.test(fmt.trim())) return fmtGeneral(v);
     let sec = secs[0], x = v;
     if (v < 0 && secs.length >= 2 && secs[1] !== '') { sec = secs[1]; x = -v; }
     else if (v === 0 && secs.length >= 3) sec = secs[2];
-    if (/general/i.test(sec)) return sec.replace(/general/i, fmtNum(x)).replace(/"/g, '');
+    if (/general/i.test(sec)) return sec.replace(/general/i, fmtGeneral(x)).replace(/"/g, '');
     const out = formatSection(x, sec);
     return (x < 0 && /[0#?]/.test(sec) && out.replace(/[^1-9]/g, '') !== '' ? '-' : '') + out;
   }
