@@ -1038,7 +1038,9 @@
     // operators and scalar functions apply element by element
     // sc: ranges are intersected with the formula cell (an ordinary formula
     // whose inline arrays still compute element by element)
-    aev(node, ctx, sc) { return this.aevPost(this.aev1(node, ctx, sc), ctx, sc); }
+    // (a single cell reference is a scalar even in an array context, as
+    // Calc's single reference: SUMPRODUCT(B4^2) with text in B4 is #VALUE!)
+    aev(node, ctx, sc) { return this.aevPost(this.aev1(node, ctx, sc), ctx, sc || (node.t === 'ref' && !node.b)); }
     // an error function of the formula has run (counted once: see countErrFuncs)
     // an error met while the formula still has an error function to run:
     // Calc's interpreter goes on with it set (see ev0); null otherwise
@@ -1232,6 +1234,12 @@
             }));
           }
           if (!ELEMENTWISE.has(name)) return mark(this.ev0(node, ctx));
+          // (Calc's add-in functions take their arguments as in an ordinary
+          // formula even in an array context: SUMPRODUCT(QUOTIENT(B1:B3,2)) is B1/2)
+          if (!sc && ADDIN.has(name)) {
+            const fa = this.fa; this.fa = 0;
+            try { return this.aev1x(node, ctx, true); } finally { this.fa = fa; }
+          }
           if (name === 'POWER' && node.args.length === 2 && node.args.every((n) => n.t !== 'missing')) {
             // POWER is Calc's ^ operator: over arrays it follows ^
             const r = this.aev1({ t: 'bin', op: '^', a: node.args[0], b: node.args[1], fnPow: true }, ctx, sc);
@@ -1331,6 +1339,10 @@
     // a formula part holding an inline array ({1,2}*2, LEN({"a","bb"})) is
     // computed element by element even outside array functions, as in Calc
     ev(node, ctx) {
+      if (this.fa && !this.inElem && (node.t === 'bin' || node.t === 'neg' || node.t === 'pct' || node.t === 'fn')) {
+        const v = this.aev1(node, ctx, false);
+        return v instanceof Range ? v : this.aevPost(v, ctx, false);
+      }
       if ((node.t === 'bin' || node.t === 'neg' || node.t === 'pct' || node.t === 'fn') && hasArr(node)) {
         // (a function that gives a reference, IF(1,A4,{1,2}), still gives one)
         if (node.t === 'fn') { const v = this.aev1(node, ctx, true); if (v instanceof Range) return v; return this.aevPost(v, ctx, true); }
@@ -2841,16 +2853,23 @@
     'ISNONTEXT', 'ISREF', 'COUNT', 'COUNTA', 'N']);
   // parameters that take one value: an array there gives one result per element
   const LOOKUPS = new Set(['VLOOKUP', 'HLOOKUP', 'MATCH']);
-  const MAPPED_PARAMS = { COUNTIF: [1], SUMIF: [1], AVERAGEIF: [1], VLOOKUP: [0], HLOOKUP: [0], MATCH: [0], INDEX: [1, 2] };
+  const MAPPED_PARAMS = { COUNTIF: [1], SUMIF: [1], AVERAGEIF: [1], VLOOKUP: [0, 2], HLOOKUP: [0, 2], MATCH: [0], INDEX: [1, 2],
+    LARGE: [1], SMALL: [1] };
+  const ADDIN = new Set(['QUOTIENT', 'RANDBETWEEN']);
   const ELEMENTWISE = new Set(['IF', 'IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'ISERROR', 'ISNA', 'ISERR', 'ISLOGICAL',
     'ISNONTEXT', 'LEN', 'ABS', 'ROUND', 'ROUNDUP', 'ROUNDDOWN', 'INT', 'TRUNC', 'SIGN', 'NOT', 'UPPER', 'LOWER', 'LEFT',
     'RIGHT', 'MID', 'TRIM', 'VALUE', 'MOD', 'POWER', 'SQRT', 'EXACT', 'EXP', 'LN', 'SEARCH', 'FIND', 'SUBSTITUTE',
-    'PROPER', 'REPT', 'CODE', 'CHAR', 'ISODD', 'ISEVEN', 'N', 'T', 'CONCATENATE']);
+    'PROPER', 'REPT', 'CODE', 'CHAR', 'ISODD', 'ISEVEN', 'N', 'T', 'CONCATENATE', 'LOG', 'LOG10', 'FACT', 'EVEN', 'ODD',
+    'TEXT', 'QUOTIENT', 'CEILING', 'FLOOR', 'RANDBETWEEN']);
   def('SUMPRODUCT', 1, undefined, function (nodes, ctx) {
     const grids = [];
     for (const n of nodes) {
       if (n.t === 'missing') { grids.push([[0]]); continue; }
-      const v = this.aev(n, ctx);
+      // (Calc's force-array parameter: functions inside take their
+      // arguments as arrays too, SUMPRODUCT(MAX(A1:A3*B1:B3)))
+      this.fa = (this.fa || 0) + 1;
+      let v;
+      try { v = this.aev(n, ctx); } finally { this.fa--; }
       if (isErr(v)) return v;
       if (isMV(v)) return E.VALUE;
       grids.push(v instanceof Matrix ? v.data : [[v]]);
