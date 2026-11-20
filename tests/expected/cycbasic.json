@@ -1,0 +1,125 @@
+{
+ "selfsum": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "B2": "cyc",
+    "B3": true
+   }
+  }
+ },
+ "two": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    },
+    "C2": -1,
+    "C3": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "three": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": {
+     "error": "#VALUE!"
+    },
+    "D1": 0,
+    "D2": 3
+   }
+  }
+ },
+ "avgself": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 5,
+    "A2": 7,
+    "A3": {
+     "error": "#VALUE!"
+    },
+    "A4": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "iferrself": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 3,
+    "A2": 0,
+    "A3": 0,
+    "B1": 0
+   }
+  }
+ },
+ "maxcol": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 5,
+    "A3": {
+     "error": "#VALUE!"
+    },
+    "B1": 5
+   }
+  }
+ },
+ "crosssheet": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    }
+   },
+   "Other": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ }
+}
