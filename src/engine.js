@@ -3270,6 +3270,8 @@
   def('VALUE', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['v']); if (isErr(a)) return a;
     const v = a[0];
+    let u = nodes[0]; while (u.t === 'paren') u = u.a;
+    if (typeof v === 'boolean' && u.t === 'ref') return v ? 1 : 0; // (a cell's boolean: a plain number)
     if (typeof v === 'number' || typeof v === 'boolean') return v;
     if (isMV(v)) return 0;
     if (v === null || v === EMPTYR) return E.IARG;
