@@ -1453,6 +1453,12 @@
               return noElse && r === false && !this.toBool(xs[0]) ? EPATH : r;
             }, true, true)));
             if (anyBool && res instanceof Matrix) res.boolRes = true;
+            // (a cell's boolean an element takes is a plain number then: IF({1,2},A5,-1) is 0)
+            else if (res instanceof Matrix && res.data.some((row) => row.some((x) => typeof x === 'boolean'))) {
+              const m = new Matrix(res.data.map((row) => row.map((x) => (typeof x === 'boolean' ? +x : x))));
+              for (const k of Object.keys(res)) if (k !== 'data' && k !== 'rows' && k !== 'cols') m[k] = res[k];
+              return m;
+            }
             return res;
           }
           const mp = MAPPED_PARAMS[name];
