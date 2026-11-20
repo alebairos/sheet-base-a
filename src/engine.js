@@ -636,9 +636,9 @@
         // (an exponent running into a '.' when the mantissa had none, or into
         // another signed exponent, is a name too: 1E3.5, 1E-3., .5E3.5,
         // 1.5e-1E-3; 1.5E3.5 is a syntax error)
-        if (m[2] && ((after[0] === '.' && !/^\d+\./.test(m[1])) || /^[eE][+-]\d/.test(after))) {
+        if (m[2] && ((after[0] === '.' && !/^\d+\./.test(m[1])) || /^[eE][+-]/.test(after))) {
           // (after the dot: up to the next dot, letters too unless the exponent was signed)
-          const w = after[0] === '.' ? (/[+-]/.test(m[2]) ? /^\.\d*(?:[eE][+-]?\d+)?/ : /^\.\w*/).exec(after)[0] : /^[eE][+-][\w.]*/.exec(after)[0];
+          const w = after[0] === '.' ? (/[+-]/.test(m[2]) ? /^\.\d*(?:[eE][+-]?\d+)?/ : /^\.\w*/).exec(after)[0] : after[0];
           toks.push({ t: 'name', v: m[0] + w });
           i += m[0].length + w.length;
           continue;
@@ -1145,7 +1145,11 @@
     // Calc's single reference: SUMPRODUCT(B4^2) with text in B4 is #VALUE!)
     aev(node, ctx, sc) {
       let u = node; while (u.t === 'paren') u = u.a; // ((B7) is the same single reference)
-      return this.aevPost(this.aev1(node, ctx, sc), ctx, sc || (u.t === 'ref' && !u.b));
+      const v = this.aev1(node, ctx, sc);
+      // (a single reference a function passes on, IFERROR(A7,0), IF(1,A7), stays
+      // one, as does the one cell INDEX or OFFSET gives)
+      const single = v instanceof Range && u.t === 'fn' && (v.single || ((u.name === 'INDEX' || u.name === 'OFFSET') && v.rows === 1 && v.cols === 1));
+      return this.aevPost(v, ctx, sc || (u.t === 'ref' && !u.b) || single);
     }
     // an error function of the formula has run (counted once: see countErrFuncs)
     // an error met while the formula still has an error function to run:
@@ -1656,7 +1660,9 @@
             return E.NAME;
           }
           const b = node.b || node.a;
-          return new Range(sh, node.a.r, node.a.c, b.r, b.c);
+          const rg = new Range(sh, node.a.r, node.a.c, b.r, b.c);
+          if (!node.b) rg.single = true; // (Calc's single reference: a scalar in an array context too)
+          return rg;
         }
         case 'ref3d': {
           const s1 = this.wb.sheet(node.sheet), s2 = this.wb.sheet(node.sheet2);
