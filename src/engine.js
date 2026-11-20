@@ -39,6 +39,7 @@
 
   // ---------------------------------------------------------------- helpers
   const MAXROW = 1048576, MAXCOL = 16384;
+  const AMISS = { amiss: true }; // an array element beyond a smaller array (see amap)
   const E48 = Math.pow(2, -48);
 
   function approxEqual(a, b) {
@@ -918,15 +919,28 @@
               if (isErr(b) && !b.fromRef && !this.pend) this.pend = { err: b, clr: this.clr };
               // a branch no element takes neither leaves a pending error nor sizes the result
               if (name === 'IF' ? !used(k) : k === 1 && !used(1)) { this.pend = before; b = null; }
+              // the condition's size holds where it is above 1; a branch only
+              // extends the result along a dimension where the condition is 1
+              if (b instanceof Matrix && ((first.rows > 1 && b.rows > first.rows) || (first.cols > 1 && b.cols > first.cols))) {
+                const R = first.rows > 1 ? Math.min(b.rows, first.rows) : b.rows, C = first.cols > 1 ? Math.min(b.cols, first.cols) : b.cols;
+                b = new Matrix(b.data.slice(0, R).map((row) => row.slice(0, C)));
+              }
               args.push(b);
             }
             const noElse = name === 'IF' && node.args.length < 3;
+            // as large as the largest argument; a position the chosen branch
+            // lacks is #N/A
             return mark(this.amap(args, (...xs) => {
+              if (xs[0] === AMISS) return E.NA;
               // a text element of an array condition is an error (even numeric text)
               if (name === 'IF' && typeof xs[0] === 'string') return E.VALUE;
+              let pick = 1;
+              if (name === 'IF') { const t = this.toBool(xs[0]); pick = isErr(t) ? 0 : t ? 1 : 2; } else pick = isErr(xs[0]) ? 1 : 0;
+              if (pick && xs[pick] === AMISS) return E.NA;
+              xs = xs.map((x) => (x === AMISS ? null : x));
               const r = asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx));
               return noElse && r === false && !this.toBool(xs[0]) ? null : r;
-            }));
+            }, true, true));
           }
           const mp = MAPPED_PARAMS[name];
           if (mp) {
@@ -962,7 +976,8 @@
             // Calc's matrix NOT: an error or text that is not a number gives 0
             return mark(this.amap(args, (x) => (isErr(x) || (typeof x === 'string' && textToNum(x) === null) ? 0 : asComputed(this.call({ t: 'fn', name, args: [lit(x)] }, ctx)))));
           }
-          return mark(this.amap(args, (...xs) => asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx))));
+          // as large as the largest argument, #VALUE! where one lacks the position
+          return mark(this.amap(args, (...xs) => asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx)), name !== 'POWER'));
         }
         default: return this.ev(node, ctx);
       }
@@ -979,7 +994,8 @@
     // result is as large as the smallest operand
     // (comparisons, big: as large as the largest operand, #VALUE! where an
     // operand has no element)
-    amap(args, f, big) {
+    // (pass: a missing element reaches f as AMISS instead of making #VALUE!)
+    amap(args, f, big, pass) {
       let R = big ? 1 : Infinity, C = big ? 1 : Infinity;
       const pick = big ? Math.max : Math.min;
       for (const m of args) if (m instanceof Matrix) { if (m.rows > 1) R = pick(R, m.rows); if (m.cols > 1) C = pick(C, m.cols); }
@@ -996,7 +1012,10 @@
         const row = [];
         for (let c = 0; c < C; c++) {
           const xs = args.map((m) => at(m, r, c));
-          if (big && xs.includes(OUT)) { row.push(E.VALUE); continue; }
+          if (big && xs.includes(OUT)) {
+            if (!pass) { row.push(E.VALUE); continue; }
+            for (let k = 0; k < xs.length; k++) if (xs[k] === OUT) xs[k] = AMISS;
+          }
           row.push(f(...xs));
         }
         out.push(row);
