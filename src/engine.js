@@ -370,6 +370,17 @@
     get rows() { return this.data.length; }
     get cols() { return this.data[0].length; }
   }
+  // An array IF without an else branch leaves an empty element where the
+  // condition is false: skipped by aggregates (like an empty element) but
+  // FALSE where it is taken as a value (epm marks those positions)
+  const EPATH = { emptyPath: true };
+  const epath = (m) => {
+    if (!m.data.some((row) => row.includes(EPATH))) return m;
+    m.epm = m.data.map((row) => row.map((x) => x === EPATH));
+    m.data = m.data.map((row) => row.map((x) => (x === EPATH ? null : x)));
+    return m;
+  };
+  const m00 = (m) => (m.epm && m.epm[0][0] ? EPATH : m.data[0][0]);
   // a union of references, (A1:A2,B1): only aggregate functions take it
   class RefList {
     constructor(ranges) { this.ranges = ranges; }
@@ -794,13 +805,14 @@
 
     finalValue(v, ctx) {
       if (v instanceof Range) v = this.intersect(v, ctx);
-      else if (v instanceof Matrix) v = v.data[0][0];
+      else if (v instanceof Matrix) v = m00(v);
       else if (v instanceof RefList) {
         // a 3D reference as the result: the formula's own sheet's range, if
         // it is among the sheets (inside operations it is an error)
         v = v.is3d ? this.own3d(v, ctx) : E.VALUE;
       }
       if (v === null) return EMPTYR;
+      if (v === EPATH) return false;
       if (v === MISSING || isLB(v)) return 0;
       if (typeof v === 'number') {
         if (!isFinite(v)) return E.NUM;
@@ -836,7 +848,7 @@
     // scalar value of an operand
     scalar(v, ctx) {
       if (v instanceof Range) return this.intersect(v, ctx);
-      if (v instanceof Matrix) return v.data[0][0];
+      if (v instanceof Matrix) return m00(v);
       if (v instanceof RefList) return v.is3d ? this.own3d(v, ctx) : E.IARG;
       return v;
     }
@@ -973,8 +985,8 @@
       // In an ordinary formula (sc) an array made by a function ("jm") reaches
       // another function's scalar parameter as its first element only, as in
       // Calc; operators still apply element by element.
-      const one = (m) => (sc && m instanceof Matrix && m.jm ? m.data[0][0] : m);
-      const mark = (m) => { if (sc && m instanceof Matrix && !m.jm) { m = new Matrix(m.data); m.jm = true; } return m; };
+      const one = (m) => (sc && m instanceof Matrix && m.jm ? m00(m) : m);
+      const mark = (m) => { if (sc && m instanceof Matrix && !m.jm) { const e = m.epm; m = new Matrix(m.data); m.jm = true; if (e) m.epm = e; } return m; };
       const jmOf = (r, ms) => { if (sc) r.jm = ms.filter((m) => m instanceof Matrix).every((m) => m.jm); return r; };
       switch (node.t) {
         case 'paren': return this.aev(node.a, ctx, sc);
@@ -1053,7 +1065,7 @@
             const noElse = name === 'IF' && node.args.length < 3;
             // as large as the largest argument; a position the chosen branch
             // lacks is #N/A
-            return mark(this.amap(args, (...xs) => {
+            return mark(epath(this.amap(args, (...xs) => {
               if (xs[0] === AMISS) return E.NA;
               // a text element of an array condition is an error (even numeric text)
               if (name === 'IF' && typeof xs[0] === 'string') return E.VALUE;
@@ -1062,8 +1074,8 @@
               if (pick && xs[pick] === AMISS) return E.NA;
               xs = xs.map((x) => (x === AMISS ? null : x));
               const r = asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx));
-              return noElse && r === false && !this.toBool(xs[0]) ? null : r;
-            }, true, true));
+              return noElse && r === false && !this.toBool(xs[0]) ? EPATH : r;
+            }, true, true)));
           }
           const mp = MAPPED_PARAMS[name];
           if (mp) {
@@ -1077,8 +1089,16 @@
             return mark(this.amap(args, (...xs) => {
               const a2 = node.args.slice();
               mp.forEach((i, k) => { if (args[k] !== null) a2[i] = lit(xs[k]); });
+              const pos = this.amPos;
               const r = this.call({ t: 'fn', name, args: a2 }, ctx);
-              return asComputed(r instanceof Range ? this.intersect(r, ctx) : r instanceof Matrix ? r.data[0][0] : r);
+              if (r instanceof Range) {
+                // a reference per element: its cell at the element's position
+                const rr = r.rows === 1 ? 0 : pos[0], cc = r.cols === 1 ? 0 : pos[1];
+                if (rr >= r.rows || cc >= r.cols) return E.NA;
+                const x = this.cellValue(r.sheet, r.r1 + rr, r.c1 + cc);
+                return asComputed(x === null || x === EMPTYR ? 0 : x);
+              }
+              return asComputed(r instanceof Matrix ? r.data[0][0] : r);
             }));
           }
           if (!ELEMENTWISE.has(name)) return mark(this.ev0(node, ctx));
@@ -1136,7 +1156,8 @@
       const at = (m, r, c) => {
         if (!(m instanceof Matrix)) return m;
         const rr = m.rows === 1 ? 0 : r, cc = m.cols === 1 ? 0 : c;
-        return rr < m.rows && cc < m.cols ? m.data[rr][cc] : big ? OUT : E.NA;
+        if (!(rr < m.rows && cc < m.cols)) return big ? OUT : E.NA;
+        return m.epm && m.epm[rr][cc] ? EPATH : m.data[rr][cc];
       };
       const out = [];
       for (let r = 0; r < R; r++) {
@@ -1147,6 +1168,7 @@
             if (!pass) { row.push(E.VALUE); continue; }
             for (let k = 0; k < xs.length; k++) if (xs[k] === OUT) xs[k] = AMISS;
           }
+          this.amPos = [r, c];
           row.push(f(...xs));
         }
         out.push(row);
@@ -1294,7 +1316,7 @@
     toNum(v) {
       if (typeof v === 'number') return v;
       if (typeof v === 'boolean') return v ? 1 : 0;
-      if (v === null || v === MISSING || v === EMPTYR || isLB(v)) return 0;
+      if (v === null || v === MISSING || v === EMPTYR || isLB(v) || v === EPATH) return 0;
       if (isErr(v)) return v;
       if (typeof v === 'string') {
         const n = textToNum(v);
@@ -1308,13 +1330,14 @@
       if (typeof v === 'boolean') return v ? '1' : '0';
       if (v === null || v === MISSING || isLB(v)) return '';
       if (v === EMPTYR) return '0';
+      if (v === EPATH) return 'FALSE';
       if (isErr(v)) return v;
       return E.VALUE;
     }
     toBool(v) {
       if (typeof v === 'boolean') return v;
       if (typeof v === 'number') return v !== 0;
-      if (v === null || v === MISSING || v === EMPTYR || isLB(v)) return false;
+      if (v === null || v === MISSING || v === EMPTYR || isLB(v) || v === EPATH) return false;
       if (isErr(v)) return v;
       if (typeof v === 'string') {
         const n = textToNum(v);
@@ -1564,6 +1587,8 @@
   function compare(a, b) {
     if (a === EMPTYR || isLB(a)) a = null;
     if (b === EMPTYR || isLB(b)) b = null;
+    if (a === EPATH) a = 0;
+    if (b === EPATH) b = 0;
     if (a === null || a === MISSING) a = typeof b === 'string' ? '' : 0;
     if (b === null || b === MISSING) b = typeof a === 'string' ? '' : 0;
     if (typeof a === 'boolean') a = a ? 1 : 0;
@@ -2154,7 +2179,7 @@
   def('IFERROR', 2, 2, function (nodes, ctx) {
     if (nodes[0].t === 'missing') return E.NA;
     const v = this.ev(nodes[0], ctx);
-    if (v instanceof RefList) return v; // a reference list is not an error: passed on
+    if (v instanceof RefList && !v.is3d) return v; // a reference list is not an error: passed on
     const s = this.scalar(v, ctx);
     if (s === UNKNOWN_FN) return E.NOOP;
     if (isErr(s)) {
@@ -2181,19 +2206,22 @@
       // parameters are examined last to first, as Calc pops them
       for (let k = vals.length - 1; k >= 0; k--) {
         const v = vals[k];
-        if (v instanceof Range) {
+        if (v instanceof Range || v instanceof RefList) {
           let err = null;
-          this.eachCell(v, (x) => {
-            if (isErr(x)) { err = x; return false; }
-            if (typeof x === 'number' || typeof x === 'boolean') { acc = combine(acc, !!+x); any = true; }
-            return true;
-          });
-          if (err) return err;
+          for (const rg of v instanceof RefList ? v.ranges : [v]) {
+            this.eachCell(rg, (x) => {
+              if (isErr(x)) { err = x; return false; }
+              if (typeof x === 'number' || typeof x === 'boolean') { acc = combine(acc, !!+x); any = true; }
+              return true;
+            });
+            if (err) return err;
+          }
         } else if (v instanceof Matrix) {
-          // an inline or computed array holding text is an invalid argument
+          // an inline or computed array holding text or an empty element is
+          // an invalid argument
           for (const row of v.data) for (const x of row) {
             if (isErr(x)) return x;
-            if (typeof x === 'number' || typeof x === 'boolean') { acc = combine(acc, !!+x); any = true; } else if (typeof x === 'string') return E.IARG;
+            if (typeof x === 'number' || typeof x === 'boolean') { acc = combine(acc, !!+x); any = true; } else if (typeof x === 'string' || x === null) return E.IARG;
           }
         } else if (isErr(v)) return v;
         else if (typeof v === 'number' || typeof v === 'boolean') { acc = combine(acc, !!+v); any = true; } else if (v === EMPTYR || isLB(v)) { acc = combine(acc, false); any = true; } else if (typeof v === 'string') return E.VALUE;
@@ -2227,7 +2255,7 @@
   def('ISTEXT', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) === 'string'; });
   def('ISERROR', 1, 1, function (nodes, ctx) {
     const r = this.ev(nodes[0], ctx);
-    if (r instanceof RefList) return false;
+    if (r instanceof RefList && !r.is3d) return false;
     const v = this.scalar(r, ctx);
     return v === UNKNOWN_FN ? E.NOOP : isErr(v);
   });
@@ -2326,7 +2354,7 @@
   def('ISNA', 1, 1, function (nodes, ctx) { const v = this.sv(nodes[0], ctx); return isErr(v) && v.code === '#N/A'; });
   def('ISERR', 1, 1, function (nodes, ctx) {
     const r = this.ev(nodes[0], ctx);
-    if (r instanceof RefList) return false;
+    if (r instanceof RefList && !r.is3d) return false;
     const v = this.scalar(r, ctx);
     return isErr(v) && v.code !== '#N/A';
   });

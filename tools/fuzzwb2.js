@@ -2,7 +2,7 @@
 'use strict';
 // Dev-only: random workbooks with three sheets (one needing quotes), a 5x10
 // grid, all 40 spec functions, chains between sheets and the odd cycle.
-// Usage: [FUZZ_ERRLIT=1] node tools/fuzzwb2.js <seed> <count> > tests/cases/name.json
+// Usage: [FUZZ_ERRLIT=1] [FUZZ_RICH=1] node tools/fuzzwb2.js <seed> <count> > tests/cases/name.json
 const seed0 = parseInt(process.argv[2] || '1', 10);
 const count = parseInt(process.argv[3] || '50', 10);
 let seed = seed0;
@@ -48,6 +48,9 @@ function makeBook() {
   const LEAVES = ['1', '2', '0', '3', '"a"', '""', 'TRUE', 'FALSE', '-1', '0.5', '"3"', '"apple"', '10', '2.5'];
   // FUZZ_ERRLIT=1: error constants among the leaves too
   if (process.env.FUZZ_ERRLIT) LEAVES.push('#N/A', '#DIV/0!', '#VALUE!', '#NUM!');
+  // FUZZ_RICH=1: inline arrays (empty elements, booleans), 3D and cross-sheet
+  // ranges, whole columns, percents, unary plus on text
+  if (process.env.FUZZ_RICH) LEAVES.push('{1,,2}', '{TRUE,"a"}', '{}', '{1;-2;"x"}', '50%', '+"5"', '-+A1', 'SUM(Data:Calc!A1:B2)', 'COUNT(Data!A1:Calc!A3)', 'SUM(A:A)', 'COUNTA(B:B)', 'MAX(Data:Calc!C1)', 'ROWS(Data:Calc!A1:A2)', 'Data:Calc!B2');
   const leaf = (s) => (chance(0.55) ? ref(s) : pick(LEAVES));
   const expr = (s, d) => {
     if (d <= 0) return leaf(s);
