@@ -621,10 +621,12 @@
           i += m[0].length + w.length;
           continue;
         }
-        // (an unsigned exponent running into '.', or any exponent into another
-        // signed exponent, is a name too: 1E3.5, 1.5e-1E-3; 1e-0.5 is a syntax error)
-        if (m[2] && ((/^\.[\d.]/.test(after) && !/[+-]/.test(m[2])) || /^[eE][+-]\d/.test(after))) {
-          const w = /^(?:[eE][+-])?[\w.]*/.exec(after)[0];
+        // (an exponent running into a '.' when the mantissa had none, or into
+        // another signed exponent, is a name too: 1E3.5, 1E-3., .5E3.5,
+        // 1.5e-1E-3; 1.5E3.5 is a syntax error)
+        if (m[2] && ((after[0] === '.' && !/^\d+\./.test(m[1])) || /^[eE][+-]\d/.test(after))) {
+          // (after the dot: up to the next dot, letters too unless the exponent was signed)
+          const w = after[0] === '.' ? (/[+-]/.test(m[2]) ? /^\.\d*(?:[eE][+-]?\d+)?/ : /^\.\w*/).exec(after)[0] : /^[eE][+-][\w.]*/.exec(after)[0];
           toks.push({ t: 'name', v: m[0] + w });
           i += m[0].length + w.length;
           continue;
@@ -2220,10 +2222,15 @@
       }
       start = broken ? idx[0] : found !== null ? idx[found] : idx[last];
     }
-    let foundRow = -1, fsi = firstStringIgnore && !skipped, eq = false;
+    let foundRow = -1, fsi = firstStringIgnore && !skipped, eq = false, ended = true;
+    // (along a row, an ascending text search passes over numbers, but a walk
+    // that runs to the end of the row on one is no match: MATCH("x",{-3,"b"}
+    // as cells) is 2, MATCH("x",{"b",-3} as cells) is #N/A)
+    const passNums = !binary && byStr && asc;
     for (let r = start; r < n; r++) {
       const c = list[r];
       if (c === null || (allStringIgnore && isStr(c))) continue;
+      if (passNums && typeof c === 'number') { if (r === n - 1) foundRow = -1; continue; }
       if (isStr(c) === byStr && c !== ERRC) {
         const t = cmp(c);
         if (asc ? t <= 0 : t >= 0) { foundRow = r; fsi = false; if (t === 0) { eq = true; break; } continue; }
@@ -2688,7 +2695,7 @@
   // (count: COUNTIF, where an error constant as the range is the result)
   function condArgs(self, nodes, ctx, count) {
     const rg = self.ev(nodes[0], ctx);
-    if (isErr(rg) && !rg.tok) return rg;
+    if (isErr(rg) && !rg.tok && !rg.lit) return rg; // (an error constant range: after the criterion)
     let crit = self.sv(nodes[1], ctx);
     const s = nodes.length > 2 && nodes[2].t !== 'missing' ? self.ev(nodes[2], ctx) : undefined;
     // computed errors first (in order); then, as Calc pops the parameters,
@@ -2699,7 +2706,8 @@
       if (nodes[2].t === 'missing') return E.PARAM;
       if (isErr(s) || !(s instanceof Range || s instanceof Matrix)) return E.VALUE;
     }
-    if (isErr(rg)) return count ? rg : isErr(crit) ? crit : E.VALUE;
+    // (a criterion range that cannot be intersected is popped first: its #VALUE! wins)
+    if (isErr(rg)) return count ? (crit === EREF['#VALUE!'] ? crit : rg) : isErr(crit) ? crit : E.VALUE;
     // (a criterion read from an error cell is popped first: its error wins)
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return isErr(crit) ? crit : E.PARAM;
     if (crit === MISSING || isLB(crit)) crit = null;
