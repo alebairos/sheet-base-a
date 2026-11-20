@@ -14,7 +14,7 @@ Requires Node.js (>= 18). No dependencies, no build step.
 
 ## Layout
 
-- `src/engine.js` — tokenizer, parser, evaluator and the functions (runs in Node and in the browser): the spec's 40, plus PI, COUNTBLANK, PROPER, EXACT, VALUE, FIND, SEARCH, ISNA, ISERR, ISLOGICAL, ISNONTEXT, N, T, SIGN, TRUNC, REPT, SUBSTITUTE, CHAR, CODE, CHOOSE, ROWS, COLUMNS, OFFSET, SUMPRODUCT, COUNTIFS, SUMIFS, AVERAGEIFS, HLOOKUP, EXP, LN, LOG, LOG10, FACT, ISODD, ISEVEN, EVEN, ODD, QUOTIENT, CEILING, FLOOR, VAR, VARP, STDEVP, LARGE, SMALL, RAND, RANDBETWEEN, TEXT (number formats, no dates or fractions). Unknown functions give `#NAME?` after their arguments are computed (a computed error argument wins), as in Calc.
+- `src/engine.js` — tokenizer, parser, evaluator and the functions (runs in Node and in the browser): the spec's 40, plus PI, COUNTBLANK, PROPER, EXACT, VALUE, FIND, SEARCH, ISNA, ISERR, ISLOGICAL, ISNONTEXT, N, T, SIGN, TRUNC, REPT, SUBSTITUTE, CHAR, CODE, CHOOSE, ROWS, COLUMNS, OFFSET, SUMPRODUCT, COUNTIFS, SUMIFS, AVERAGEIFS, HLOOKUP, EXP, LN, LOG, LOG10, FACT, ISODD, ISEVEN, EVEN, ODD, QUOTIENT, CEILING, FLOOR, VAR, VARP, STDEVP, LARGE, SMALL, RAND, RANDBETWEEN, TEXT (number formats, no dates or fractions), ROW, COLUMN. Unknown functions give `#NAME?` after their arguments are computed (a computed error argument wins), as in Calc.
 - `bin/engine` — the CLI.
 - `src/csv.js` — CSV import/export; `ui/` — the browser UI.
 - `tests/src/*.txt` — formula lists; `tests/cases/*.json` the workbooks built from them; `tests/expected/*.json` LibreOffice's results.
@@ -26,6 +26,8 @@ Requires Node.js (>= 18). No dependencies, no build step.
 - Numbers in the output are rounded to 15 significant digits as Calc writes them (the shortest round-trip decimal, rounded half up), and integers below 2^53 are written exactly.
 - Arithmetic follows Calc's rounding: `+`/`-` snap results that cancel to within 2^-48 to 0 (but never between exact integers), and SUM/AVERAGE/SUMPRODUCT use Calc's Kahan summation (parameters taken last to first; SUM sums each range column on its own, blocks of 8 values in SSE2 lanes, the last term added with the same snapping), so `SUM(0.1,0.2,-0.3)` is 0. Inline and computed arrays are searched with exact number equality, cell ranges with approximate equality.
 - An empty argument (`SUM(1,)`, `LEFT("abc",)`) is 0 as in Calc; references can be intersected (`A1:B3 B2`, a disjoint intersection is `#NULL!`) and joined (`SUM((A1:A2,B1))`); 3D references (`SUM(Sheet1:Sheet3!A1)`, also `'Sheet1:Sheet3'!A1`) cover the sheets between, in workbook order.
+- Calc's internal errors without an Excel name are kept apart inside the engine (`Err:502` invalid argument, `Err:504` parameter error, `Err:508`-`Err:511` formula syntax, `Err:522` circular reference): the output shows them as `#VALUE!`, but text criteria see their own text (`COUNTIF(A1,"Err:502")`, `COUNTIF(A1:A9,"*a*")` does not count `SQRT(-1)`). `tests/cases/errcodes.json` checks the code of about 750 `#VALUE!` results from other fixtures (the code is read with COUNTIF in LibreOffice).
+- `^`/POWER results that underflow to a subnormal number or zero are `#NUM!`.
 - Text functions count Unicode code points; `CHAR`/`CODE` use UTF-8 like Calc on Linux (`CHAR(233)` is U+FFFD).
 - Booleans are numbers with a boolean format, as in Calc: `TRUE+1` is 2, `TRUE&""` is `"1"`, and a result is reported as `true`/`false` when Calc would format it as a boolean.
 - An empty text constant (`""`) in the input is an empty cell.

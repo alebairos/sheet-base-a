@@ -21,8 +21,14 @@
   // a lookup whose lookup value is #N/A gives an internal Calc error that
   // files show as #N/A but that ISNA does not recognise
   E.LOOKNA = new FErr('Err:LOOKNA', false); EREF['Err:LOOKNA'] = new FErr('Err:LOOKNA', true);
+  // Calc's internal errors without an Excel name: files show them as #VALUE!,
+  // but text criteria (COUNTIF(A1,"Err:502")) see their own text
+  for (const [k, code] of Object.entries({
+    IARG: 'Err:502', PARAM: 'Err:504', PAREN: 'Err:508', NOOP: 'Err:509', NOVAR: 'Err:510', NOARG: 'Err:511',
+    CIRC: 'Err:522',
+  })) { E[k] = new FErr(code, false); EREF[code] = new FErr(code, true); }
   const errByCode = (code) => Object.values(E).find((e) => e.code === code) || new FErr(code);
-  const errText = (code) => (code[0] === '#' ? code : '#N/A');
+  const errText = (code) => (code[0] === '#' ? code : code === 'Err:LOOKNA' ? '#N/A' : '#VALUE!');
   const isErr = (v) => v instanceof FErr;
   const asRefErr = (v) => (isErr(v) && !v.fromRef ? (EREF[v.code] || new FErr(v.code, true)) : v);
   // an error whose pending state was cleared (IFERROR, ISNUMBER, ... ran
@@ -423,9 +429,14 @@
     const peek = () => toks[p];
     const isOp = (v) => toks[p].t === 'op' && toks[p].v === v;
     // a missing ')' at the end is auto-closed, as Calc does
+    // Calc's syntax errors (all shown as #VALUE!): Err:508 for a bracket or
+    // separator problem, Err:509 for a missing operator, Err:510 for a missing
+    // operand, Err:511 for an unfinished argument list
+    const fail = (msg, code) => { const e = new SyntaxError(msg); e.code = code; throw e; };
+    const operandNext = () => toks[p].t !== 'op' || toks[p].v === '(' || toks[p].v === '{';
     const expect = (v) => {
       if (v === ')' && toks[p].t === 'eof') return;
-      if (!isOp(v)) throw new SyntaxError('expected ' + v);
+      if (!isOp(v)) fail('expected ' + v, operandNext() ? 'Err:509' : 'Err:508');
       p++;
     };
 
@@ -485,12 +496,12 @@
       for (;;) {
         if (isOp(',')) { list.push({ t: 'missing' }); p++; continue; }
         if (isOp(')')) { list.push({ t: 'missing' }); p++; return list; }
-        if (toks[p].t === 'eof') { if (list.length) throw new SyntaxError('unterminated argument list'); return list; }
+        if (toks[p].t === 'eof') { if (list.length) fail('unterminated argument list', 'Err:511'); return list; }
         list.push(comparison());
         if (isOp(',')) {
           p++;
           if (isOp(')')) { list.push({ t: 'missing' }); p++; return list; }
-          if (toks[p].t === 'eof') throw new SyntaxError('unterminated argument list');
+          if (toks[p].t === 'eof') fail('unterminated argument list', 'Err:511');
           continue;
         }
         expect(')');
@@ -553,10 +564,11 @@
       }
       const e = new SyntaxError('unexpected token');
       if (t.t === 'eof') e.code = '#N/A';
+      else if (t.t === 'op') e.code = t.v === ')' || t.v === ';' ? 'Err:508' : 'Err:510';
       throw e;
     }
     const ast = comparison();
-    if (peek().t !== 'eof') throw new SyntaxError('trailing input');
+    if (peek().t !== 'eof') fail('trailing input', isOp(')') || isOp(';') ? 'Err:508' : 'Err:509');
     return ast;
   }
 
@@ -617,7 +629,7 @@
       if (cell.state === 2) return cell.value;
       // A cell that is being computed reads as an error (Calc's Err:522, which
       // round-trips as #VALUE!); the error then propagates through the cycle.
-      if (cell.state === 1) return EREF['#VALUE!'];
+      if (cell.state === 1) return EREF['Err:522'];
       this.evalCell(sh, cell);
       return cell.value;
     }
@@ -679,7 +691,7 @@
     scalar(v, ctx) {
       if (v instanceof Range) return this.intersect(v, ctx);
       if (v instanceof Matrix) return v.data[0][0];
-      if (v instanceof RefList) return E.VALUE;
+      if (v instanceof RefList) return E.IARG;
       return v;
     }
 
@@ -1067,7 +1079,9 @@
         return UNKNOWN_FN;
       }
       const n = node.args.length;
-      if (n < f.min || (f.max !== undefined && n > f.max)) return E.VALUE;
+      // too few arguments: Err:511; too many: Err:508 for one-parameter functions, else Err:504
+      if (n < f.min) return E.NOARG;
+      if (f.max !== undefined && n > f.max) return f.max === 1 ? E.PAREN : E.PARAM;
       const r = f.fn.call(this, node.args, ctx);
       if (CLEARS_ERROR.has(node.name)) this.clr++;
       return r;
@@ -1162,7 +1176,7 @@
           }
         } else if (typeof v === 'number') { nums.push(v); } else if (typeof v === 'boolean') { nums.push(v ? 1 : 0); } else if (v === EMPTYR) { nums.push(0); } else if (isErr(v)) { if (!opts.skipErrors) return { err: v }; } else if (typeof v === 'string') {
           const n = textToNum(v);
-          if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: E.VALUE };
+          if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: opts.textParam ? E.PARAM : E.VALUE };
         }
         if (parts[parts.length - 1] === nums) parts[parts.length - 1] = nums.slice(n0);
         else if (nums.length > n0 && !(v instanceof Range)) parts.push(nums[n0]);
@@ -1243,7 +1257,7 @@
     if (typeof v === 'string') return v;
     if (typeof v === 'number') return fmtNum(v);
     if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
-    if (isErr(v)) return v.code;
+    if (isErr(v)) return v.code === 'Err:LOOKNA' ? '#N/A' : v.code;
     return '';
   }
 
@@ -1517,8 +1531,8 @@
   // AVERAGE adds every value to one Kahan sum (no per-column sums)
   aggregate('AVERAGE', (n, b, parts) => (n.length ? finite(kahan(popOrder(parts)) / n.length) : E.DIV0));
   const asFmt = (x, b) => (b && (x === 0 || x === 1) ? x === 1 : x);
-  aggregate('MIN', (n, b) => (n.length ? asFmt(Math.min(...n), b) : 0), {}, 1);
-  aggregate('MAX', (n, b) => (n.length ? asFmt(Math.max(...n), b) : 0), {}, 1);
+  aggregate('MIN', (n, b) => (n.length ? asFmt(Math.min(...n), b) : 0), { textParam: true }, 1);
+  aggregate('MAX', (n, b) => (n.length ? asFmt(Math.max(...n), b) : 0), { textParam: true }, 1);
   aggregate('PRODUCT', (n, b, parts) => (n.length ? finite(popOrder(parts).reduce((x, y) => x * y, 1)) : 0));
   aggregate('COUNT', (n) => n.length, { skipErrors: true, countText: true });
   aggregate('MEDIAN', (n) => {
@@ -1526,9 +1540,9 @@
     const s = n.slice().sort((a, b) => a - b);
     const m = s.length >> 1;
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-  }, { forward: true }, 1);
+  }, { forward: true, textParam: true }, 1);
   // variance: values in Calc's order (parameters last to first, cells first to last)
-  aggregate('STDEV', (n, b, parts) => (n.length < 2 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), false))));
+  aggregate('STDEV', (n, b, parts) => (n.length < 2 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), false))), { textParam: true });
 
   const variance = (n, pop) => {
     const mean = kahan(n) / n.length;
@@ -1536,15 +1550,15 @@
     for (const x of n) ss += (x - mean) * (x - mean);
     return ss / (n.length - (pop ? 0 : 1));
   };
-  aggregate('VAR', (n, b, parts) => (n.length < 2 ? E.DIV0 : variance(popOrder(parts), false)));
-  aggregate('VARP', (n, b, parts) => (n.length < 1 ? E.DIV0 : variance(popOrder(parts), true)));
-  aggregate('STDEVP', (n, b, parts) => (n.length < 1 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), true))));
+  aggregate('VAR', (n, b, parts) => (n.length < 2 ? E.DIV0 : variance(popOrder(parts), false)), { textParam: true });
+  aggregate('VARP', (n, b, parts) => (n.length < 1 ? E.DIV0 : variance(popOrder(parts), true)), { textParam: true });
+  aggregate('STDEVP', (n, b, parts) => (n.length < 1 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), true))), { textParam: true });
   const kth = (largest) => function (nodes, ctx) {
     if (nodes.length !== 2) return E.VALUE;
-    const r = this.collect([nodes[0]], ctx, {});
+    const r = this.collect([nodes[0]], ctx, { textParam: true });
     if (r.err) return r.err;
     const a = this.args([nodes[1]], ctx, ['v']); if (isErr(a)) return a;
-    if (typeof a[0] === 'string') return E.VALUE;
+    if (typeof a[0] === 'string') return E.PARAM;
     const k = Math.ceil(approxValue(+a[0]));
     if (k < 1 || k > r.nums.length) return E.VALUE;
     const s = r.nums.slice().sort((x, y) => (largest ? y - x : x - y));
@@ -1634,19 +1648,19 @@
     return typeof r === 'number' && !isFinite(r) ? E.NUM : r;
   });
   math1('EXP', (x) => Math.exp(x));
-  math1('LN', (x) => (x <= 0 ? E.VALUE : Math.log(x)));
-  math1('LOG10', (x) => (x <= 0 ? E.VALUE : Math.log10(x)));
+  math1('LN', (x) => (x <= 0 ? E.IARG : Math.log(x)));
+  math1('LOG10', (x) => (x <= 0 ? E.IARG : Math.log10(x)));
   math1('FACT', (x) => {
     x = Math.floor(x);
-    if (x < 0) return E.VALUE;
+    if (x < 0) return E.IARG;
     let f = 1;
     for (let i = 2; i <= x && isFinite(f); i++) f *= i;
     return isFinite(f) ? f : E.VALUE;
   });
   const parity = (odd) => function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['v']); if (isErr(a)) return a;
-    if (a[0] === null || a[0] === EMPTYR) return E.VALUE;
-    const x = this.toNum(a[0]); if (isErr(x)) return x;
+    if (a[0] === null || a[0] === EMPTYR) return E.PARAM;
+    const x = this.toNum(a[0]); if (isErr(x)) return E.PARAM;
     return Math.abs(Math.trunc(x)) % 2 === (odd ? 1 : 0);
   };
   def('ISODD', 1, 1, parity(true));
@@ -1655,20 +1669,20 @@
   math1('ODD', (x) => { let c = Math.ceil(Math.abs(approxValue(x))); if (c % 2 === 0) c++; return x < 0 ? -c : c; });
   def('LOG', 1, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n', 'n'], [undefined, 10]); if (isErr(a)) return a;
-    if (a[0] <= 0 || a[1] <= 0 || a[1] === 1) return E.VALUE;
+    if (a[0] <= 0 || a[1] <= 0 || a[1] === 1) return E.IARG;
     return Math.log(a[0]) / Math.log(a[1]);
   });
   def('QUOTIENT', 2, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n', 'n']); if (isErr(a)) return a;
-    if (a[1] === 0) return E.VALUE;
+    if (a[1] === 0) return E.IARG;
     return Math.trunc(approxValue(a[0] / a[1]));
   });
   const toMultiple = (up) => function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n', 'n']); if (isErr(a)) return a;
     const [x, m] = a;
-    if (m === 0) return up ? 0 : E.VALUE;
+    if (m === 0) return up ? 0 : E.IARG;
     if (x === 0) return 0;
-    if (x > 0 && m < 0) return E.VALUE;
+    if (x > 0 && m < 0) return E.IARG;
     const q = approxValue(x / m);
     return approxValue((up ? Math.ceil(q) : Math.floor(q)) * m);
   };
@@ -1678,13 +1692,13 @@
   def('RANDBETWEEN', 2, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n', 'n']); if (isErr(a)) return a;
     const lo = Math.ceil(a[0]), hi = Math.floor(a[1]);
-    if (lo > hi) return E.VALUE;
+    if (lo > hi) return E.IARG;
     return lo + Math.floor(Math.random() * (hi - lo + 1));
   });
 
   def('SQRT', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n']); if (isErr(a)) return a;
-    if (a[0] < 0) return E.VALUE;
+    if (a[0] < 0) return E.IARG;
     return Math.sqrt(a[0]);
   });
 
@@ -1692,14 +1706,14 @@
   function condArgs(self, nodes, ctx) {
     const rg = self.ev(nodes[0], ctx);
     if (isErr(rg)) return rg;
-    if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.VALUE;
+    if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.PARAM;
     let crit = self.sv(nodes[1], ctx);
     if (crit === MISSING) crit = null;
     const match = makeCriterion(crit);
     if (isErr(match)) return match;
     let sum = rg;
     if (nodes.length > 2) {
-      if (nodes[2].t === 'missing') return E.VALUE;
+      if (nodes[2].t === 'missing') return E.PARAM;
       const s = self.ev(nodes[2], ctx);
       if (isErr(s)) return s;
       if (rg instanceof Matrix) {
@@ -1787,7 +1801,7 @@
     if (nodes[0].t === 'missing') return E.NA;
     const v = this.ev(nodes[0], ctx);
     const s = this.scalar(v, ctx);
-    if (s === UNKNOWN_FN) return E.VALUE;
+    if (s === UNKNOWN_FN) return E.NOOP;
     if (isErr(s)) { const alt = this.ev(nodes[1], ctx); return alt === MISSING ? 0 : alt; }
     return v === MISSING ? 0 : v;
   });
@@ -1813,9 +1827,10 @@
           });
           if (err) return err;
         } else if (v instanceof Matrix) {
+          // an inline or computed array holding text is an invalid argument
           for (const row of v.data) for (const x of row) {
             if (isErr(x)) return x;
-            if (typeof x === 'number' || typeof x === 'boolean') { acc = combine(acc, !!+x); any = true; }
+            if (typeof x === 'number' || typeof x === 'boolean') { acc = combine(acc, !!+x); any = true; } else if (typeof x === 'string') return E.IARG;
           }
         } else if (isErr(v)) return v;
         else if (typeof v === 'number' || typeof v === 'boolean') { acc = combine(acc, !!+v); any = true; } else if (v === EMPTYR) { acc = combine(acc, false); any = true; } else if (typeof v === 'string') return E.VALUE;
@@ -1849,7 +1864,7 @@
   def('ISTEXT', 1, 1, function (nodes, ctx) { return typeof this.sv(nodes[0], ctx) === 'string'; });
   def('ISERROR', 1, 1, function (nodes, ctx) {
     const v = this.sv(nodes[0], ctx);
-    return v === UNKNOWN_FN ? E.VALUE : isErr(v);
+    return v === UNKNOWN_FN ? E.NOOP : isErr(v);
   });
 
   // ---- text
@@ -1871,20 +1886,20 @@
   def('LEFT', 1, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n'], [undefined, 1]); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
-    if (a[1] < 0 || n > INT32) return E.VALUE; // checked before truncation
+    if (a[1] < 0 || n > INT32) return E.IARG; // checked before truncation
     return codePoints(a[0]).slice(0, n).join('');
   });
   def('RIGHT', 1, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n'], [undefined, 1]); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
-    if (a[1] < 0 || n > INT32) return E.VALUE;
+    if (a[1] < 0 || n > INT32) return E.IARG;
     const cps = codePoints(a[0]);
     return n === 0 ? '' : cps.slice(Math.max(0, cps.length - n)).join('');
   });
   def('MID', 3, 3, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n', 'n']); if (isErr(a)) return a;
     const st = Math.trunc(a[1]), n = Math.trunc(a[2]);
-    if (st < 1 || a[2] < 0 || st > INT32 || n > INT32) return E.VALUE;
+    if (st < 1 || a[2] < 0 || st > INT32 || n > INT32) return E.IARG;
     return codePoints(a[0]).slice(st - 1, st - 1 + n).join('');
   });
   def('LEN', 1, 1, function (nodes, ctx) {
@@ -1917,9 +1932,9 @@
     const a = this.args(nodes, ctx, ['v']); if (isErr(a)) return a;
     const v = a[0];
     if (typeof v === 'number' || typeof v === 'boolean') return v;
-    if (v === null || v === EMPTYR) return E.VALUE;
+    if (v === null || v === EMPTYR) return E.IARG;
     const n = textToNum(String(v));
-    return n === null ? E.VALUE : n;
+    return n === null ? E.IARG : n;
   });
   def('FIND', 2, 3, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 's', 'n'], [undefined, undefined, 1]); if (isErr(a)) return a;
@@ -1932,7 +1947,7 @@
   def('SEARCH', 2, 3, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 's', 'n'], [undefined, undefined, 1]); if (isErr(a)) return a;
     const st = Math.trunc(a[2]);
-    if (st < 1 || st > a[1].length + 1) return E.VALUE;
+    if (st < 1 || st > a[1].length + 1) return E.IARG;
     const re = new RegExp(wildcardRe(a[0]).source.slice(1, -1), 'iu');
     const m = re.exec(a[1].slice(st - 1));
     return m ? cpCount(a[1].slice(0, m.index + st - 1)) + 1 : E.VALUE;
@@ -2083,7 +2098,8 @@
   def('REPT', 2, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s', 'n']); if (isErr(a)) return a;
     const n = Math.trunc(a[1]);
-    if (a[1] < 0 || a[0].length * n > 32767) return E.VALUE;
+    if (a[1] < 0) return E.IARG;
+    if (a[0].length * n >= 2 ** 29) return E.NA; // Calc's string overflow reads back as #N/A
     return a[0].repeat(n);
   });
   def('SUBSTITUTE', 3, 4, function (nodes, ctx) {
@@ -2092,7 +2108,7 @@
     if (from === '') return t;
     if (nth === undefined) return t.split(from).join(to);
     const k = Math.trunc(nth);
-    if (k < 1) return E.VALUE;
+    if (k < 1) return E.IARG;
     let i = -1;
     for (let j = 0; j < k; j++) { i = t.indexOf(from, i + 1); if (i < 0) return t; }
     return t.slice(0, i) + to + t.slice(i + from.length);
@@ -2100,13 +2116,13 @@
   def('CHAR', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n']); if (isErr(a)) return a;
     const n = Math.trunc(a[0]);
-    if (n < 1 || n > 255) return E.VALUE;
+    if (n < 1 || n > 255) return E.IARG;
     // Calc decodes the byte in the system encoding (UTF-8): a lone byte >= 128 is invalid
     return n < 128 ? String.fromCharCode(n) : '\uFFFD';
   });
   def('CODE', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['s']); if (isErr(a)) return a;
-    if (a[0] === '') return E.VALUE;
+    if (a[0] === '') return 0;
     // Calc converts the first character to the system encoding (UTF-8) and gives its first byte
     const u = a[0].charCodeAt(0);
     if (u < 0x80) return u;
@@ -2116,19 +2132,38 @@
   def('CHOOSE', 2, undefined, function (nodes, ctx) {
     const a = this.args(nodes.slice(0, 1), ctx, ['n']); if (isErr(a)) return a;
     const i = Math.trunc(a[0]);
-    if (i < 1 || i >= nodes.length) return E.VALUE;
+    if (i < 1 || i >= nodes.length) return E.IARG;
     const v = this.ev(nodes[i], ctx);
     return v === MISSING ? 0 : v;
   });
+  const rowCol = (row) => function (nodes, ctx) {
+    if (!nodes.length || nodes[0].t === 'missing') return (row ? ctx.r : ctx.c) + 1;
+    const v = this.ev(nodes[0], ctx);
+    if (isErr(v)) return v;
+    if (!(v instanceof Range)) return E.PARAM;
+    // several rows / columns give an array of their numbers (a function-made
+    // array: aggregates take it whole, a scalar parameter its first element)
+    if ((row ? v.rows : v.cols) > 1) {
+      const xs = [];
+      if (row) for (let r = v.r1; r <= v.r2; r++) xs.push([r + 1]);
+      else { xs.push([]); for (let c = v.c1; c <= v.c2; c++) xs[0].push(c + 1); }
+      const m = new Matrix(xs);
+      m.jm = true;
+      return m;
+    }
+    return (row ? v.r1 : v.c1) + 1;
+  };
+  def('ROW', 0, 1, rowCol(true));
+  def('COLUMN', 0, 1, rowCol(false));
   def('ROWS', 1, 1, function (nodes, ctx) {
     const v = this.ev(nodes[0], ctx);
     if (isErr(v)) return v;
-    return v instanceof Range || v instanceof Matrix ? v.rows : E.VALUE;
+    return v instanceof Range || v instanceof Matrix ? v.rows : E.PARAM;
   });
   def('COLUMNS', 1, 1, function (nodes, ctx) {
     const v = this.ev(nodes[0], ctx);
     if (isErr(v)) return v;
-    return v instanceof Range || v instanceof Matrix ? v.cols : E.VALUE;
+    return v instanceof Range || v instanceof Matrix ? v.cols : E.PARAM;
   });
   // OFFSET(ref, rows, cols, [height], [width]): a reference moved and resized
   def('OFFSET', 3, 5, function (nodes, ctx) {
@@ -2136,14 +2171,14 @@
     const a = this.args(nodes.slice(1), ctx, ['n', 'n', 'n', 'n']);
     if (isErr(ref)) return ref;
     if (isErr(a)) return a;
-    if (!(ref instanceof Range)) return E.VALUE;
+    if (!(ref instanceof Range)) return E.PARAM;
     const dr = Math.trunc(a[0]), dc = Math.trunc(a[1]);
     let h = a[2] === undefined ? ref.rows : Math.trunc(a[2]);
     let w = a[3] === undefined ? ref.cols : Math.trunc(a[3]);
     // a size below 1 or a result outside the sheet is an invalid argument
-    if (h < 1 || w < 1) return E.VALUE;
+    if (h < 1 || w < 1) return E.IARG;
     const r1 = ref.r1 + dr, c1 = ref.c1 + dc, r2 = r1 + h - 1, c2 = c1 + w - 1;
-    if (r1 < 0 || c1 < 0 || r2 >= MAXROW || c2 >= MAXCOL) return E.VALUE;
+    if (r1 < 0 || c1 < 0 || r2 >= MAXROW || c2 >= MAXCOL) return E.IARG;
     return new Range(ref.sheet, r1, c1, r2, c2);
   });
   // functions that reset Calc's pending error (nGlobalError) when they finish
@@ -2191,7 +2226,7 @@
       pairs.push([rg, m]);
     }
     const R = pairs[0][0].rows, C = pairs[0][0].cols;
-    if (pairs.some(([rg]) => rg.rows !== R || rg.cols !== C)) return E.VALUE;
+    if (pairs.some(([rg]) => rg.rows !== R || rg.cols !== C)) return E.IARG;
     const hits = [];
     const r2 = Math.min(R - 1, Math.max(...pairs.map(([rg]) => Math.max(rg.sheet.maxR - rg.r1, 0))));
     const c2 = Math.min(C - 1, Math.max(...pairs.map(([rg]) => Math.max(rg.sheet.maxC - rg.c1, 0))));
@@ -2213,7 +2248,7 @@
     if (!(sr instanceof Range)) return E.VALUE;
     const h = multiCond(self, nodes, ctx, 1); if (isErr(h)) return h;
     const first = self.ev(nodes[1], ctx);
-    if (first.rows !== sr.rows || first.cols !== sr.cols) return E.VALUE;
+    if (first.rows !== sr.rows || first.cols !== sr.cols) return E.IARG;
     const nums = [];
     for (const [r, c] of h.hits) {
       const v = self.cellValue(sr.sheet, sr.r1 + r, sr.c1 + c);
@@ -2240,7 +2275,7 @@
     const row = Math.trunc(rest[0]);
     const sorted = nodes.length > 3 && nodes[3].t === 'missing' ? false : rest[1];
     if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
-    if (row < 1 || row > tbl.rows) return E.VALUE;
+    if (row < 1 || row > tbl.rows) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
     if (v === null) return E.NA;
     const g = this.grid(tbl);
@@ -2263,8 +2298,7 @@
     const col = Math.trunc(rest[0]);
     const sorted = nodes.length > 3 && nodes[3].t === 'missing' ? false : rest[1];
     if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
-    if (col < 1) return E.VALUE;
-    if (col > tbl.cols) return E.VALUE;
+    if (col < 1 || col > tbl.cols) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
     if (v === null) return E.NA;
     const g = this.grid(tbl);
@@ -2283,11 +2317,11 @@
     const rest = this.args(nodes.slice(2), ctx, ['n'], [1]);
     if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
     if (isErr(rg)) return rg;
-    if (rg === MISSING) return E.VALUE;
+    if (rg === MISSING) return E.PARAM;
     if (isErr(rest)) return rest;
     if (isErr(v)) return v;
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.NA;
-    if (rg.rows !== 1 && rg.cols !== 1) return E.VALUE;
+    if (rg.rows !== 1 && rg.cols !== 1) return E.PARAM;
     if (v === null) return E.NA;
     const g = this.grid(rg);
     const list = rg.cols === 1 ? g.map((row) => row[0]) : g[0];
@@ -2302,14 +2336,14 @@
     if (isErr(a)) return a;
     let row = Math.trunc(a[0]);
     let col = a[1] === undefined ? undefined : Math.trunc(a[1]);
-    if (Math.trunc(a[2]) !== 1) return a[2] < 1 ? E.VALUE : E.REF; // a single area
+    if (Math.trunc(a[2]) !== 1) return a[2] < 1 ? E.IARG : E.REF; // a single area
     let tgt = ref;
     const scalar = !(tgt instanceof Range) && !(tgt instanceof Matrix);
-    if (scalar) { if (row < 0 || (col !== undefined && col < 0)) return E.VALUE; return E.REF; } // not a reference
+    if (scalar) { if (row < 0 || (col !== undefined && col < 0)) return E.IARG; return E.REF; } // not a reference
     if (col === undefined) {
       if (tgt.rows === 1 && tgt.cols > 1) { col = row; row = 0; } else col = 0;
     }
-    if (row < 0 || col < 0) return E.VALUE;
+    if (row < 0 || col < 0) return E.IARG;
     if (row > tgt.rows || col > tgt.cols) return E.REF;
     if (tgt instanceof Matrix) {
       if (row === 0 && col === 0) return tgt;
@@ -2472,7 +2506,7 @@
   }
 
   const api = {
-    computeWorkbook, parse, tokenize, fmtNum, textToNum, parseAddr, addrName, colName, colIndex, Engine, FUNCS,
+    computeWorkbook, recalcAll, parse, tokenize, fmtNum, textToNum, parseAddr, addrName, colName, colIndex, Engine, FUNCS,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SheetEngine = api;
