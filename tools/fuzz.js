@@ -61,5 +61,6 @@ function expr(d) {
 }
 
 const out = new Set();
-while (out.size < count) out.add(expr(1 + Math.floor(rnd() * 3)));
+// the generator can fall into a short cycle: stop after a bounded number of tries
+for (let tries = 0; out.size < count && tries < count * 50; tries++) out.add(expr(1 + Math.floor(rnd() * 3)));
 process.stdout.write([...out].join('\n') + '\n');
