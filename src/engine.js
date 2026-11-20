@@ -27,6 +27,16 @@
     IARG: 'Err:502', PARAM: 'Err:504', PAREN: 'Err:508', NOOP: 'Err:509', NOVAR: 'Err:510', NOARG: 'Err:511',
     CIRC: 'Err:522', STROVF: 'Err:513', OVF: 'Err:514', CODEOVF: 'Err:512',
   })) { E[k] = new FErr(code, false); EREF[code] = new FErr(code, true); }
+  // a lookup given a computed error as its lookup value gives an internal
+  // error: shown with that error's code (#N/A as Err:LOOKNA), but read as
+  // #VALUE! once a later function cleared the pending error
+  const ELOOK = {};
+  const lookErr = (v) => {
+    if (v.code === '#N/A' || v === E.LOOKNA) return E.LOOKNA;
+    if (v.look) return v;
+    if (!ELOOK[v.code]) { ELOOK[v.code] = new FErr(v.code, false); ELOOK[v.code].look = true; }
+    return ELOOK[v.code];
+  };
   const errByCode = (code) => Object.values(E).find((e) => e.code === code) || new FErr(code);
   // (files show the lookup error and Err:513, string overflow, as #N/A)
   const errText = (code) => (code[0] === '#' ? code : code === 'Err:LOOKNA' || code === 'Err:512' || code === 'Err:513' || code === 'Err:514' ? '#N/A' : '#VALUE!');
@@ -39,7 +49,7 @@
   const ETOK = {};
   const demote = (v) => {
     if (!isErr(v) || v.fromRef) return v;
-    const code = v === E.LOOKNA ? '#VALUE!' : v.code;
+    const code = v === E.LOOKNA || v.look ? '#VALUE!' : v.code;
     if (!ETOK[code]) { ETOK[code] = new FErr(code, true); ETOK[code].tok = true; }
     return ETOK[code];
   };
@@ -2485,7 +2495,7 @@
     const tbl = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
     if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
-    if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
+    if (isErr(v) && !v.fromRef) return lookErr(v);
     if (isErr(tbl)) return tbl;
     if (isErr(rest)) return rest;
     const row = Math.trunc(rest[0]);
@@ -2509,7 +2519,7 @@
     const tbl = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
     if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
-    if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
+    if (isErr(v) && !v.fromRef) return lookErr(v);
     if (isErr(tbl)) return tbl;
     if (isErr(rest)) return rest;
     const col = Math.trunc(rest[0]);
@@ -2533,7 +2543,7 @@
     const rg = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n'], [1]);
     if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
-    if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
+    if (isErr(v) && !v.fromRef) return lookErr(v);
     if (isErr(rg)) return rg;
     if (rg === MISSING) return E.PARAM;
     if (isErr(rest)) return rest;

@@ -1,0 +1,1226 @@
+{
+ "=VLOOKUP(INDEX(B1:B3,2,2),A1:B3,2,0)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=VLOOKUP(INDEX(B1:B3,2,2),A1:B3,2,0)"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(VLOOKUP(INDEX(B1:B3,2,2),A1:B3,2,0),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(VLOOKUP(INDEX(B1:B3,2,2),A1:B3,2,0),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(INDEX(B1:B3,2,2),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(INDEX(B1:B3,2,2),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=INDEX(B1:B3,2,2)&ISTEXT(2)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=INDEX(B1:B3,2,2)&ISTEXT(2)"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=INDEX(B1:B3,2,2)+ISTEXT(2)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=INDEX(B1:B3,2,2)+ISTEXT(2)"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=(1/0)&ISTEXT(2)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=(1/0)&ISTEXT(2)"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(1/0,ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(1/0,ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(NA(),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(NA(),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(SQRT(-1),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(SQRT(-1),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(VLOOKUP(9,A1:B3,2,0),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(VLOOKUP(9,A1:B3,2,0),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(VLOOKUP(NA(),A1:B3,2,0),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(VLOOKUP(NA(),A1:B3,2,0),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=STDEV(INDEX(B1:B3,2,2),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=STDEV(INDEX(B1:B3,2,2),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=STDEV(OR(A1:A3,INDEX(B1:B3,2,2)),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=STDEV(OR(A1:A3,INDEX(B1:B3,2,2)),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=SUM(INDEX(B1:B3,2,2),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=SUM(INDEX(B1:B3,2,2),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=SUM(1/0,ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=SUM(1/0,ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=STDEV(1/0,ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=STDEV(1/0,ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=STDEV(1/0,ISTEXT(2),1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=STDEV(1/0,ISTEXT(2),1)"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=STDEV(NA(),\"\",1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=STDEV(NA(),\"\",1)"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=STDEV(NA(),1,ISTEXT(2)&\"\")": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=STDEV(NA(),1,ISTEXT(2)&\"\")"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=ROUND(INDEX(B1:B3,2,2),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=ROUND(INDEX(B1:B3,2,2),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=IF(INDEX(B1:B3,2,2),1,ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=IF(INDEX(B1:B3,2,2),1,ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=OR(INDEX(B1:B3,2,2),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=OR(INDEX(B1:B3,2,2),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=AND(1/0,ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=AND(1/0,ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=LEN(INDEX(B1:B3,4))&ISNUMBER(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=LEN(INDEX(B1:B3,4))&ISNUMBER(1)"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(VLOOKUP(1/0,A1:B3,2,0),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(VLOOKUP(1/0,A1:B3,2,0),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(MATCH(1/0,A1:A3,0),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(MATCH(1/0,A1:A3,0),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(MATCH(INDEX(B1:B3,2,2),A1:A3,0),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(MATCH(INDEX(B1:B3,2,2),A1:A3,0),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(HLOOKUP(1/0,A1:B3,2,0),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(HLOOKUP(1/0,A1:B3,2,0),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(VLOOKUP(SQRT(-1),A1:B3,2,0),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(VLOOKUP(SQRT(-1),A1:B3,2,0),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=VLOOKUP(1/0,A1:B3,2,0)&ISTEXT(2)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=VLOOKUP(1/0,A1:B3,2,0)&ISTEXT(2)"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=ISERR(VLOOKUP(1/0,A1:B3,2,0))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=ISERR(VLOOKUP(1/0,A1:B3,2,0))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=IFERROR(VLOOKUP(1/0,A1:B3,2,0),\"e\")": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=IFERROR(VLOOKUP(1/0,A1:B3,2,0),\"e\")"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=VLOOKUP(1/0,A1:B3,2,0)+COUNT(1)": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=VLOOKUP(1/0,A1:B3,2,0)+COUNT(1)"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ },
+ "=CONCATENATE(VLOOKUP(A12,A1:B3,2,0),ISTEXT(2))": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": "text",
+    "A5": true,
+    "A7": "5",
+    "A8": -1.5,
+    "A9": 0,
+    "A10": "Apple",
+    "A11": "banana",
+    "A12": "=1/0",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": "x",
+    "B5": false,
+    "B6": "  padded  ",
+    "B7": 2.5,
+    "B8": "Banana",
+    "B9": 100,
+    "B10": "apple pie",
+    "B11": "",
+    "B12": 7,
+    "C1": "=CONCATENATE(VLOOKUP(A12,A1:B3,2,0),ISTEXT(2))"
+   },
+   "Sheet2": {
+    "A1": 10,
+    "A2": 20,
+    "A3": "two",
+    "B1": "=A1*2"
+   }
+  }
+ }
+}
