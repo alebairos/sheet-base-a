@@ -55,7 +55,6 @@
     return ELIT[code];
   };
   // a computed error kept as a token on Calc's stack (see Engine.ev0)
-  // (like an error constant, but a matrix-scalar power still reports it)
   const ECONT = {};
   const tokOf = (v) => {
     if (!ECONT[v.code]) { const e = ECONT[v.code] = new FErr(v.code, true); e.tok = true; e.lit = true; e.cont = true; }
@@ -1119,8 +1118,10 @@
           if (op === '^' && !(a instanceof Matrix && b instanceof Matrix)) {
             // Calc's matrix-scalar power: text and error elements are NaN to
             // pow(), so x^0 and 1^y are 1 and anything else is #NUM!
-            const pre = !node.fnPow && [a, b].find((v) => !(v instanceof Matrix) && isErr(v) && (!v.fromRef || v.cont));
-            if (pre) return pre.cont ? errByCode(pre.code) : pre;
+            // (a pending error is the result; an error Calc went on past is a
+            // NaN operand like the others: NA()^ISTEXT({1,2}) is {1,1})
+            const pre = !node.fnPow && [a, b].find((v) => !(v instanceof Matrix) && isErr(v) && !v.fromRef);
+            if (pre) return pre;
             const num = (v) => {
               if (v === null || v === undefined || v === EMPTYR || v === MISSING) return 0;
               const n = this.toNum(v);
@@ -1149,9 +1150,10 @@
         }
         case 'fn': {
           const name = node.name;
-          if (name === 'IF' || name === 'IFERROR') {
+          if (name === 'IF' || name === 'IFERROR' || name === 'CHOOSE') {
             // a scalar condition/value picks a whole branch; an array one picks
-            // element by element (IF without an else branch leaves the element empty)
+            // element by element (IF without an else branch leaves the element empty;
+            // CHOOSE's array index is a jump matrix like IF's condition)
             const pend0 = this.pend;
             const first = node.args[0].t === 'missing' ? MISSING : this.aev(node.args[0], ctx, sc);
             if (!(first instanceof Matrix)) { this.pend = pend0; return mark(this.ev0(node, ctx)); }
@@ -1159,6 +1161,7 @@
             const used = (k) => first.data.some((row) => row.some((x) => {
               if (name === 'IFERROR') return k === 1 && isErr(x);
               if (isErr(x) || typeof x === 'string') return false;
+              if (name === 'CHOOSE') { const n = this.toNum(x); return !isErr(n) && Math.trunc(n) === k; }
               const b = this.toBool(x);
               return !isErr(b) && (k === 1 ? b : !b);
             }));
@@ -1174,7 +1177,7 @@
               if (isErr(b) && !b.fromRef && !this.pend && this.lastChildErr) this.pend = { err: b, clr: this.clr };
               if (!(isErr(b) && this.lastChildErr)) this.gerr = gBefore;
               // a branch no element takes neither leaves a pending error nor sizes the result
-              if (name === 'IF' ? !used(k) : k === 1 && !used(1)) { this.pend = before; this.gerr = gBefore; b = null; }
+              if (name !== 'IFERROR' ? !used(k) : k === 1 && !used(1)) { this.pend = before; this.gerr = gBefore; b = null; }
               // the condition's size holds where it is above 1; a branch only
               // extends the result along a dimension where the condition is 1
               if (b instanceof Matrix && ((first.rows > 1 && b.rows > first.rows) || (first.cols > 1 && b.cols > first.cols))) {
@@ -1189,9 +1192,13 @@
             return mark(epath(this.amap(args, (...xs) => {
               if (xs[0] === AMISS) return E.NA;
               // a text element of an array condition is an error (even numeric text)
-              if (name === 'IF' && typeof xs[0] === 'string') return E.VALUE;
+              if (name !== 'IFERROR' && typeof xs[0] === 'string') return E.VALUE;
               let pick = 1;
-              if (name === 'IF') { const t = this.toBool(xs[0]); pick = isErr(t) ? 0 : t ? 1 : 2; } else pick = isErr(xs[0]) ? 1 : 0;
+              if (name === 'IF') { const t = this.toBool(xs[0]); pick = isErr(t) ? 0 : t ? 1 : 2; } else if (name === 'CHOOSE') {
+                const n = this.toNum(xs[0]);
+                pick = isErr(n) ? 0 : Math.trunc(n);
+                if (!isErr(n) && !(pick >= 1 && pick < xs.length)) return E.IARG;
+              } else pick = isErr(xs[0]) ? 1 : 0;
               if (pick && xs[pick] === AMISS) return E.NA;
               xs = xs.map((x) => (x === AMISS ? null : x));
               const r = asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx));
@@ -2034,6 +2041,11 @@
   function hasArr(node) {
     if (node._arr !== undefined) return node._arr;
     let r = node.t === 'arr';
+    // (ROW/COLUMN of a range several rows/columns across give an array)
+    if (!r && node.t === 'fn' && (node.name === 'ROW' || node.name === 'COLUMN') && node.args && node.args[0] && node.args[0].t === 'ref' && node.args[0].b) {
+      const a = node.args[0].a, b = node.args[0].b;
+      r = node.name === 'ROW' ? a.r !== b.r : a.c !== b.c;
+    }
     if (!r) for (const k of ['a', 'b']) if (node[k] && typeof node[k] === 'object' && node[k].t && hasArr(node[k])) r = true;
     if (!r && node.args) r = node.args.some((n) => n && n.t && hasArr(n));
     node._arr = r;
