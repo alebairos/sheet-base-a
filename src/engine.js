@@ -1205,6 +1205,8 @@
       else return E.NUM;
     }
     if (!isFinite(r) || isNaN(r)) return E.NUM;
+    // the C library reports underflow (a subnormal or zero result) as a range error
+    if (x !== 0 && Math.abs(r) < 2.2250738585072014e-308) return E.NUM;
     return r;
   }
 
