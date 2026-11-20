@@ -1903,6 +1903,7 @@
     if (isErr(a)) return a;
     let row = Math.trunc(a[0]);
     let col = a[1] === undefined ? undefined : Math.trunc(a[1]);
+    if (Math.trunc(a[2]) !== 1) return a[2] < 1 ? E.VALUE : E.REF; // a single area
     let tgt = ref;
     if (!(tgt instanceof Range) && !(tgt instanceof Matrix)) tgt = new Matrix([[tgt]]);
     if (col === undefined) {
