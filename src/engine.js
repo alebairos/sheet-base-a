@@ -989,6 +989,9 @@
       // (a cell left with IFERROR's missing value: an error shown as #N/A, not ISNA)
       if (isMV(v)) v = v.na ? new FErr('Err:MISS', true) : EMPTYR;
       if (isErr(v)) v = asComputed(v);
+      // (a cell keeps a lookup's internal error as the plain error: ISNA of
+      // the cell is TRUE, and read past a reset it keeps its code)
+      if (v === E.LOOKNA || v === LOOKNA_CELL) v = E.NA; else if (isErr(v) && v.look) v = errByCode(v.code);
       cell.value = v;
       cell.state = 2;
     }
@@ -1482,10 +1485,38 @@
               args.push(b);
             }
             const noElse = name === 'IF' && node.args.length < 3;
+            const GROWN = {};
+            const firstErr = name === 'IFERROR' && first.data.some((row) => row.some(isErr));
+            // (IFERROR's result grown along a dimension its value is one
+            // element long in: only the error elements jump to the fallback,
+            // the grown positions of the others stay #N/A as Calc's result
+            // matrix starts)
+            if (name === 'IFERROR') {
+              let R = first.rows, C = first.cols;
+              for (const b of args) if (b instanceof Matrix) { R = Math.max(R, b.rows); C = Math.max(C, b.cols); }
+              if ((R > first.rows && first.rows === 1) || (C > first.cols && first.cols === 1)) {
+                const d = [];
+                for (let r = 0; r < R; r++) {
+                  const row = [];
+                  for (let c = 0; c < C; c++) {
+                    const r0 = first.rows === 1 ? 0 : r, c0 = first.cols === 1 ? 0 : c;
+                    const x = r0 < first.rows && c0 < first.cols ? first.data[r0][c0] : AMISS;
+                    row.push((r0 !== r || c0 !== c) && x !== AMISS && !isErr(x) ? GROWN : x);
+                  }
+                  d.push(row);
+                }
+                const m = new Matrix(d);
+                for (const k of Object.keys(first)) if (k !== 'data' && k !== 'rows' && k !== 'cols') m[k] = first[k];
+                args[0] = m;
+              }
+            }
             // as large as the largest argument; a position the chosen branch
             // lacks is #N/A
             const res = mark(epath(this.amap(args, (...xs) => {
-              if (xs[0] === AMISS) return E.NA;
+              if (xs[0] === AMISS || xs[0] === GROWN) return E.NA;
+              // (an IFERROR with error elements copies an empty-path element
+              // into its jump result as empty text)
+              if (name === 'IFERROR' && xs[0] === EPATH && firstErr) return '';
               // a text element of an array condition is an error (even numeric text)
               if (name !== 'IFERROR' && typeof xs[0] === 'string') return E.VALUE;
               let pick = 1;
