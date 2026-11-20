@@ -47,6 +47,13 @@
   // (an error token on Calc's stack: popped as an operand it replaces the
   // error a conversion of the other operand set)
   const ETOK = {};
+  // an error constant in a formula (=#N/A): an error token; a lookup given
+  // one as its lookup value gives #VALUE!
+  const ELIT = {};
+  const litErr = (code) => {
+    if (!ELIT[code]) { ELIT[code] = new FErr(code, true); ELIT[code].tok = true; ELIT[code].lit = true; }
+    return ELIT[code];
+  };
   const demote = (v) => {
     if (!isErr(v) || v.fromRef) return v;
     const code = v === E.LOOKNA || v.look ? '#VALUE!' : v.code;
@@ -411,6 +418,13 @@
       }
       if (ch === '#') {
         const lit = ERRLITS.find((e) => src.substr(i, e.length).toUpperCase() === e);
+        // #REF! (an invalid reference) and unknown #words read as unknown names
+        if ((!lit && !/^#GETTING_DATA/i.test(src.slice(i))) || lit === '#REF!') {
+          const w = /^#[\w.]*[!?]?\w*/.exec(src.slice(i))[0];
+          toks.push({ t: 'name', v: w });
+          i += w.length;
+          continue;
+        }
         if (!lit) throw new SyntaxError('bad error literal');
         toks.push({ t: 'err', v: lit });
         i += lit.length;
@@ -654,7 +668,7 @@
         case 'err': return { t: 'errlit', v: errByCode(t.v) };
         case 'ref': return t.sheet2 ? { t: 'ref3d', sheet: t.sheet, sheet2: t.sheet2, a: t.a, b: t.b } : { t: 'ref', sheet: t.sheet, a: t.a, b: t.b };
         case 'name': {
-          if (isOp('(')) { p++; return { t: 'fn', name: t.v.toUpperCase().replace(/^_XLFN\./, ''), args: args() }; }
+          if (isOp('(')) { p++; return { t: 'fn', name: t.v.toUpperCase(), args: args() }; }
           const u = t.v.toUpperCase();
           if (u === 'TRUE') return { t: 'bool', v: true };
           if (u === 'FALSE') return { t: 'bool', v: false };
@@ -1151,7 +1165,7 @@
         case 'num': return node.v;
         case 'str': return node.v;
         case 'bool': return node.v;
-        case 'errlit': return node.v;
+        case 'errlit': return litErr(node.v.code); // a plain error token, not a pending error
         case 'arr': return node.v;
         case 'missing': return MISSING;
         case 'lit': return node.v;
@@ -2611,6 +2625,7 @@
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
     if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
     if (isErr(v) && !v.fromRef) return lookErr(v);
+    if (isErr(v) && v.lit) return E.VALUE;
     if (isErr(tbl)) return tbl;
     if (isErr(rest)) return rest;
     const row = Math.trunc(rest[0]);
@@ -2635,6 +2650,7 @@
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
     if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
     if (isErr(v) && !v.fromRef) return lookErr(v);
+    if (isErr(v) && v.lit) return E.VALUE;
     if (isErr(tbl)) return tbl;
     if (isErr(rest)) return rest;
     const col = Math.trunc(rest[0]);
@@ -2659,6 +2675,7 @@
     const rest = this.args(nodes.slice(2), ctx, ['n'], [1]);
     if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
     if (isErr(v) && !v.fromRef) return lookErr(v);
+    if (isErr(v) && v.lit) return E.VALUE;
     if (isErr(rg)) return rg;
     if (rg === MISSING) return E.PARAM;
     if (isErr(rest)) return rest;
