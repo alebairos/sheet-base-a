@@ -2544,8 +2544,14 @@
     if (isErr(a)) return a;
     let row = Math.trunc(a[0]);
     let col = a[1] === undefined ? undefined : Math.trunc(a[1]);
-    if (Math.trunc(a[2]) !== 1) return a[2] < 1 ? E.IARG : E.REF; // a single area
     let tgt = ref;
+    if (ref instanceof RefList) {
+      // a reference list: the area-th reference
+      const k = Math.trunc(a[2]);
+      if (k < 1) return E.IARG;
+      if (k > ref.ranges.length) return E.REF;
+      tgt = ref.ranges[k - 1];
+    } else if (Math.trunc(a[2]) !== 1) return a[2] < 1 ? E.IARG : E.REF; // a single area
     const scalar = !(tgt instanceof Range) && !(tgt instanceof Matrix);
     if (scalar) { if (row < 0 || (col !== undefined && col < 0)) return E.IARG; return E.REF; } // not a reference
     if (col === undefined) {
