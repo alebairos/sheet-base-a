@@ -861,7 +861,8 @@
       for (let i = kinds.length - 1; i >= 0; i--) {
         let v = vals[i];
         if (v === undefined || v === MISSING) {
-          if (defaults && defaults[i] !== undefined) { out[i] = defaults[i]; continue; }
+          // an absent argument takes its default; an empty one (f(x,)) is 0/""/FALSE in Calc
+          if (defaults && defaults[i] !== undefined && v === undefined) { out[i] = defaults[i]; continue; }
           if (v === undefined) { out[i] = undefined; continue; }
           v = null;
         }
@@ -885,7 +886,7 @@
       const nums = [];
       const vals = [];
       for (const node of nodes) {
-        if (node.t === 'missing') continue;
+        if (node.t === 'missing') { vals.push(0); continue; } // an empty argument is 0
         const v = this.ev(node, ctx);
         if (isErr(v) && !v.fromRef && !opts.skipErrors) return { err: v };
         vals.push(v);
@@ -1246,7 +1247,7 @@
   def('COUNTA', 0, undefined, function (nodes, ctx) {
     let n = 0;
     for (const node of nodes) {
-      if (node.t === 'missing') continue;
+      if (node.t === 'missing') { n++; continue; } // an empty argument is 0
       const v = this.ev(node, ctx);
       if (v instanceof Range) this.eachCell(v, () => { n++; });
       else if (v instanceof Matrix) n += v.rows * v.cols;
@@ -1380,7 +1381,8 @@
     const match = makeCriterion(crit);
     if (isErr(match)) return match;
     let sum = rg;
-    if (nodes.length > 2 && nodes[2].t !== 'missing') {
+    if (nodes.length > 2) {
+      if (nodes[2].t === 'missing') return E.VALUE;
       const s = self.ev(nodes[2], ctx);
       if (isErr(s)) return s;
       if (rg instanceof Matrix) {
@@ -1465,6 +1467,7 @@
     return v === MISSING ? 0 : v;
   });
   def('IFERROR', 2, 2, function (nodes, ctx) {
+    if (nodes[0].t === 'missing') return E.NA;
     const v = this.ev(nodes[0], ctx);
     const s = this.scalar(v, ctx);
     if (s === UNKNOWN_FN) return E.VALUE;
@@ -1476,7 +1479,7 @@
       let acc = init, any = false;
       const vals = [];
       for (const node of nodes) {
-        if (node.t === 'missing') continue;
+        if (node.t === 'missing') { vals.push(false); continue; } // an empty argument is FALSE
         const v = this.ev(node, ctx);
         if (isErr(v) && !v.fromRef) return v;
         vals.push(v);
@@ -1780,7 +1783,7 @@
   def('SUMPRODUCT', 1, undefined, function (nodes, ctx) {
     const grids = [];
     for (const n of nodes) {
-      if (n.t === 'missing') return E.VALUE;
+      if (n.t === 'missing') { grids.push([[0]]); continue; }
       const v = this.aev(n, ctx);
       if (isErr(v)) return v;
       grids.push(v instanceof Matrix ? v.data : [[v]]);
@@ -1899,7 +1902,8 @@
     return out === null ? 0 : out;
   });
   def('MATCH', 2, 3, function (nodes, ctx) {
-    const v = this.sv(nodes[0], ctx);
+    let v = this.sv(nodes[0], ctx);
+    if (v === MISSING) v = 0;
     const rg = this.fev(nodes[1], ctx);
     const rest = this.args(nodes.slice(2), ctx, ['n'], [1]);
     if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
