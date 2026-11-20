@@ -39,7 +39,7 @@
   };
   const errByCode = (code) => Object.values(E).find((e) => e.code === code) || new FErr(code);
   // (files show the lookup error and Err:513, string overflow, as #N/A)
-  const errText = (code) => (code[0] === '#' ? code : code === 'Err:LOOKNA' || code === 'Err:512' || code === 'Err:513' || code === 'Err:514' ? '#N/A' : '#VALUE!');
+  const errText = (code) => (code[0] === '#' ? code : code === 'Err:LOOKNA' || code === 'Err:MISS' || code === 'Err:512' || code === 'Err:513' || code === 'Err:514' ? '#N/A' : '#VALUE!');
   const isErr = (v) => v instanceof FErr;
   const asRefErr = (v) => (isErr(v) && !v.fromRef ? (EREF[v.code] || new FErr(v.code, true)) : v);
   // an error whose pending state was cleared (IFERROR, ISNUMBER, ... ran
@@ -388,6 +388,13 @@
   // a 3D reference (Sheet1:Sheet3!A1): one range per sheet
   const refList3d = (ranges) => { const l = new RefList(ranges); l.is3d = true; return l; };
   const MISSING = { missing: true };
+  // an empty argument that IF, CHOOSE or IFERROR passes on (IF(1,)): Calc's
+  // missing token stays on the stack: 0 as a number, "" as text, neither
+  // number nor text; as the formula's result 0, but IFERROR's own empty
+  // value argument (IFERROR(,5)) passes one on that ends as #N/A
+  const MISSV = { missing: true, passed: true };
+  const MISSN = { missing: true, passed: true, na: true };
+  const isMV = (v) => v === MISSV || v === MISSN;
   // result of calling an unknown function with arguments: #NAME?, but
   // IFERROR/ISERROR turn it into #VALUE! instead of catching it
   const UNKNOWN_FN = new FErr('#NAME?', false);
@@ -816,6 +823,8 @@
         this.errSeen = seen; this.lastChildErr = lce;
       }
       this.running.pop();
+      // (a cell left with IFERROR's missing value: an error shown as #N/A, not ISNA)
+      if (isMV(v)) v = v.na ? new FErr('Err:MISS', true) : EMPTYR;
       if (isErr(v)) v = asComputed(v);
       cell.value = v;
       cell.state = 2;
@@ -1401,8 +1410,8 @@
           // IF and CHOOSE pass on what their chosen argument left
           if (!PASS_FMT.has(node.name)) this.boolLost = this.retLost;
           this.retLost = false;
-          // IF and CHOOSE leave an error constant on the stack as it is
-          if (isErr(r) && r.lit && PASS_FMT.has(node.name)) return r;
+          // IF, CHOOSE and IFERROR leave an error constant on the stack as it is
+          if (isErr(r) && r.lit && (PASS_FMT.has(node.name) || node.name === 'IFERROR')) return r;
           return r === UNKNOWN_FN ? r : asComputed(r); }
       }
       return E.VALUE;
@@ -1412,7 +1421,7 @@
     toNum(v) {
       if (typeof v === 'number') return v;
       if (typeof v === 'boolean') return v ? 1 : 0;
-      if (v === null || v === MISSING || v === EMPTYR || isLB(v) || v === EPATH) return 0;
+      if (v === null || v === MISSING || v === EMPTYR || isLB(v) || v === EPATH || isMV(v)) return 0;
       if (isErr(v)) return v;
       if (typeof v === 'string') {
         const n = textToNum(v);
@@ -1424,7 +1433,7 @@
       if (typeof v === 'string') return v;
       if (typeof v === 'number') return fmtNum(v);
       if (typeof v === 'boolean') return v ? '1' : '0';
-      if (v === null || v === MISSING || isLB(v)) return '';
+      if (v === null || v === MISSING || isLB(v) || isMV(v)) return '';
       if (v === EMPTYR) return '0';
       if (v === EPATH) return 'FALSE';
       if (isErr(v)) return v;
@@ -1433,7 +1442,7 @@
     toBool(v) {
       if (typeof v === 'boolean') return v;
       if (typeof v === 'number') return v !== 0;
-      if (v === null || v === MISSING || v === EMPTYR || isLB(v) || v === EPATH) return false;
+      if (v === null || v === MISSING || v === EMPTYR || isLB(v) || v === EPATH || isMV(v)) return false;
       if (isErr(v)) return v;
       if (typeof v === 'string') {
         const n = textToNum(v);
@@ -1651,7 +1660,7 @@
             if (typeof x === 'number') { nums.push(x); } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
             else if (isErr(x) && !opts.skipErrors) return { err: x };
           }
-        } else if (typeof v === 'number') { nums.push(v); } else if (typeof v === 'boolean') { nums.push(v ? 1 : 0); } else if (v === EMPTYR || isLB(v)) { nums.push(0); } else if (isErr(v)) { if (!opts.skipErrors) return { err: tokOver(k, v) }; } else if (typeof v === 'string') {
+        } else if (typeof v === 'number') { nums.push(v); } else if (typeof v === 'boolean') { nums.push(v ? 1 : 0); } else if (v === EMPTYR || isLB(v) || isMV(v)) { nums.push(0); } else if (isErr(v)) { if (!opts.skipErrors) return { err: tokOver(k, v) }; } else if (typeof v === 'string') {
           const n = textToNum(v);
           if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: opts.forward ? tokOver(k, opts.textParam ? E.PARAM : E.VALUE) : tokBefore(opts.noTok ? [] : vals, k, opts.textParam ? E.PARAM : E.VALUE) };
         }
@@ -1712,8 +1721,8 @@
   function compare(a, b) {
     if (a === EMPTYR || isLB(a)) a = null;
     if (b === EMPTYR || isLB(b)) b = null;
-    if (a === EPATH) a = 0;
-    if (b === EPATH) b = 0;
+    if (a === EPATH || isMV(a)) a = 0;
+    if (b === EPATH || isMV(b)) b = 0;
     if (a === null || a === MISSING) a = typeof b === 'string' ? '' : 0;
     if (b === null || b === MISSING) b = typeof a === 'string' ? '' : 0;
     if (typeof a === 'boolean') a = a ? 1 : 0;
@@ -2227,7 +2236,7 @@
     // (a criterion read from an error cell is popped first: its error wins)
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return isErr(crit) ? crit : E.PARAM;
     if (crit === MISSING || isLB(crit)) crit = null;
-    if (crit === EMPTYR) crit = 0;
+    if (crit === EMPTYR || isMV(crit)) crit = 0;
     const match = makeCriterion(crit);
     if (isErr(match)) return match;
     let sum = rg;
@@ -2311,14 +2320,14 @@
     if (b) {
       if (nodes.length < 2) return true;
       const v = this.ev(nodes[1], ctx);
-      return v === MISSING ? 0 : v;
+      return v === MISSING ? MISSV : v;
     }
     if (nodes.length < 3) return false;
     const v = this.ev(nodes[2], ctx);
-    return v === MISSING ? 0 : v;
+    return v === MISSING ? MISSV : v;
   });
   def('IFERROR', 2, 2, function (nodes, ctx) {
-    if (nodes[0].t === 'missing') return E.NA;
+    if (nodes[0].t === 'missing') return MISSN;
     const v = this.ev(nodes[0], ctx);
     if (v instanceof RefList && !v.is3d) return v; // a reference list is not an error: passed on
     const s = this.scalar(v, ctx);
@@ -2331,11 +2340,11 @@
       let alt;
       try { alt = this.ev(nodes[1], ctx); } finally { if (top) top.sup++; }
       this.retLost = this.boolLost;
-      return alt === MISSING ? 0 : alt;
+      return alt === MISSING ? MISSV : alt;
     }
     // Calc drops the boolean format of a value passed on (-IFERROR(FALSE,0) is 0)
     this.retLost = true;
-    return v === MISSING ? 0 : v;
+    return v === MISSING ? MISSV : v;
   });
   function logical(name, init, combine) {
     def(name, 1, undefined, function (nodes, ctx) {
@@ -2369,7 +2378,7 @@
             if (typeof x === 'number' || typeof x === 'boolean') { acc = combine(acc, !!+x); any = true; } else if (typeof x === 'string' || x === null) return E.IARG;
           }
         } else if (isErr(v)) return v;
-        else if (typeof v === 'number' || typeof v === 'boolean') { acc = combine(acc, !!+v); any = true; } else if (v === EMPTYR || isLB(v)) { acc = combine(acc, false); any = true; } else if (typeof v === 'string') return E.VALUE;
+        else if (typeof v === 'number' || typeof v === 'boolean') { acc = combine(acc, !!+v); any = true; } else if (v === EMPTYR || isLB(v) || isMV(v)) { acc = combine(acc, false); any = true; } else if (typeof v === 'string') return E.VALUE;
       }
       return any ? acc : E.VALUE;
     });
@@ -2392,7 +2401,7 @@
     this.eachCell(rg, (v) => { if (v !== '') nonBlank++; });
     return rg.rows * rg.cols - nonBlank;
   });
-  def('ISBLANK', 1, 1, function (nodes, ctx) { const v = this.sv(nodes[0], ctx); return v === null || v === LBLANK; });
+  def('ISBLANK', 1, 1, function (nodes, ctx) { const v = this.sv(nodes[0], ctx); return v === null || v === LBLANK || v === MISSV; });
   def('ISNUMBER', 1, 1, function (nodes, ctx) {
     const v = this.sv(nodes[0], ctx);
     return typeof v === 'number' || typeof v === 'boolean';
@@ -2477,6 +2486,7 @@
     const a = this.args(nodes, ctx, ['v']); if (isErr(a)) return a;
     const v = a[0];
     if (typeof v === 'number' || typeof v === 'boolean') return v;
+    if (isMV(v)) return 0;
     if (v === null || v === EMPTYR) return E.IARG;
     const n = textToNum(String(v));
     return n === null ? E.IARG : n;
@@ -2691,7 +2701,7 @@
     if (i < 1 || i >= nodes.length) return E.IARG;
     this.boolLost = false;
     const v = this.ev(nodes[i], ctx);
-    return v === MISSING ? 0 : v;
+    return v === MISSING ? MISSV : v;
   });
   const rowCol = (row) => function (nodes, ctx) {
     if (!nodes.length || nodes[0].t === 'missing') return (row ? ctx.r : ctx.c) + 1;
@@ -2728,8 +2738,9 @@
   def('OFFSET', 3, 5, function (nodes, ctx) {
     const ref = this.ev(nodes[0], ctx);
     const a = this.args(nodes.slice(1), ctx, ['n', 'n', 'n', 'n']);
-    if (isErr(ref)) return ref;
+    if (isErr(ref) && !ref.lit) return ref;
     if (isErr(a)) return a;
+    if (isErr(ref)) return E.VALUE; // an error constant as the reference: after the other arguments' errors
     if (!(ref instanceof Range)) return E.PARAM;
     const dr = Math.trunc(a[0]), dc = Math.trunc(a[1]);
     let h = a[2] === undefined ? ref.rows : Math.trunc(a[2]);
@@ -2757,6 +2768,7 @@
       if (n.t === 'missing') { grids.push([[0]]); continue; }
       const v = this.aev(n, ctx);
       if (isErr(v)) return v;
+      if (isMV(v)) return E.VALUE;
       grids.push(v instanceof Matrix ? v.data : [[v]]);
     }
     const R = grids[0].length, C = grids[0][0].length;
@@ -2782,7 +2794,7 @@
       if (!(rg instanceof Range)) return E.VALUE;
       let crit = self.sv(nodes[i + 1], ctx);
       if (crit === MISSING || isLB(crit)) crit = null;
-    if (crit === EMPTYR) crit = 0;
+    if (crit === EMPTYR || isMV(crit)) crit = 0;
       const m = makeCriterion(crit);
       if (isErr(m)) return m;
       pairs.push([rg, m]);
@@ -2843,7 +2855,7 @@
     if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
     if (row < 1 || row > tbl.rows) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
-    if (v === null) v = ''; else if (isLB(v) || v === EMPTYR) v = 0; // a blank lookup value looks for empty text (a formula's "")
+    if (v === null) v = ''; else if (isLB(v) || v === EMPTYR || isMV(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const i = lookupPos(this.firstLine(tbl, true), v, sorted ? 1 : 0, tbl instanceof Range ? 'row' : null);
     if (i < 0) return E.NA;
     let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + row - 1, tbl.c1 + i) : tbl.data[row - 1][i];
@@ -2868,7 +2880,7 @@
     if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
     if (col < 1 || col > tbl.cols) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
-    if (v === null) v = ''; else if (isLB(v) || v === EMPTYR) v = 0; // a blank lookup value looks for empty text (a formula's "")
+    if (v === null) v = ''; else if (isLB(v) || v === EMPTYR || isMV(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const first = this.firstLine(tbl, false);
     const i = lookupPos(first, v, sorted ? 1 : 0, tbl instanceof Range ? 'col' : null);
     if (i < 0) return E.NA;
@@ -2897,7 +2909,7 @@
     if (isErr(v)) return v;
     if (rg instanceof RefList) return E.VALUE;
     if (rg.rows !== 1 && rg.cols !== 1) return E.PARAM;
-    if (v === null) v = ''; else if (isLB(v) || v === EMPTYR) v = 0; // a blank lookup value looks for empty text (a formula's "")
+    if (v === null) v = ''; else if (isLB(v) || v === EMPTYR || isMV(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const list = this.firstLine(rg, rg.cols !== 1);
     const i = lookupPos(list, v, mode, rg instanceof Range ? (rg.cols === 1 ? 'col' : 'row') : null, true);
     return i < 0 ? E.NA : i + 1;
