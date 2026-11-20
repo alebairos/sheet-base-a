@@ -774,11 +774,13 @@
       const key = r * MAXCOL + c;
       sh.fcols = null; // formula-cell index used by the dependency scan
       // an empty text constant is an empty cell (as after an xlsx round trip)
-      if (raw === null || raw === undefined || raw === '') { sh.cells.delete(key); return; }
+      // so is a bare '=' (an empty formula)
+      if (raw === null || raw === undefined || raw === '' || raw === '=') { sh.cells.delete(key); return; }
       const cell = { r, c, raw, addr: addr || addrName(r, c), state: 0, value: null, ast: null };
       if (typeof raw === 'string' && raw.charAt(0) === '=' && raw.length > 1) {
         cell.formula = true;
-        try { cell.ast = parse(raw.slice(1)); } catch (e) { cell.parseError = e.code || '#VALUE!'; }
+        // Calc's compiler skips further leading '=' signs (and spaces between them): '==1' is 1
+        try { cell.ast = parse(raw.slice(1).replace(/^[\s=]*=/, '')); } catch (e) { cell.parseError = e.code || '#VALUE!'; }
         if (cell.ast && raw.length > 196) { const e = compileLimits(raw.slice(1), cell.ast); if (e) { cell.ast = null; cell.parseError = e; } }
       } else if (raw !== null && typeof raw === 'object') {
         cell.value = raw.error ? errByCode(raw.error) : null;
@@ -3056,7 +3058,7 @@
         if (typeof raw === 'string' && raw.charAt(0) === '=' && raw.length > 1) {
           const pa = parseAddr(a);
           cells[a] = pa ? outValue(eng.cellValue(sh, pa.r, pa.c)) : { error: '#REF!' };
-        } else cells[a] = raw;
+        } else cells[a] = raw === '=' ? '' : raw;
       }
       out.sheets[sh.name] = cells;
     }
