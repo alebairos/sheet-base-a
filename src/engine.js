@@ -1541,10 +1541,10 @@
     const isStr = (x) => typeof x === 'string';
     const cmp = (c) => (byStr ? strCmp(c, q) : c === ERRC ? (approxEqual(0, q) ? 0 : 0 < q ? -1 : 1) : (approxEqual(c, q) ? 0 : c < q ? -1 : 1));
     const firstStringIgnore = byStr, allStringIgnore = !byStr;
-    let row = 0;
+    let row = 0, skipped = false;
     if (firstStringIgnore && isStr(list[0])) {
       const t = cmp(list[0]);
-      if ((asc && t > 0) || (!asc && t < 0)) row++;
+      if ((asc && t > 0) || (!asc && t < 0)) { row++; skipped = true; }
     }
     while (row < n && list[row] === null) row++;
     if (allStringIgnore) while (row < n && (list[row] === null || isStr(list[row]))) row++;
@@ -1571,20 +1571,11 @@
         if (broken) break;
         if (r < 0) { if (asc) lo = mid + 1; else if (mid > 0) hi = mid - 1; else done = true; }
         else if (r > 0) { if (asc) { if (mid > 0) hi = mid - 1; else done = true; } else lo = mid + 1; }
-        else { found = mid; last = mid; if (mid > 0) hi = mid - 1; else done = true; }
+        else { found = mid; lo = mid + 1; } // an exact hit: Calc goes on searching after it
       }
       start = broken ? idx[0] : found !== null ? idx[found] : idx[last];
     }
-    if (!asc) {
-      // descending data cannot start below the value
-      for (let k = row; k < n; k++) {
-        const c = list[k];
-        if (c === null || c === ERRC || isStr(c) !== byStr) continue;
-        if (cmp(c) < 0) return -1;
-        break;
-      }
-    }
-    let foundRow = -1, fsi = firstStringIgnore, eq = false;
+    let foundRow = -1, fsi = firstStringIgnore && !skipped, eq = false;
     for (let r = start; r < n; r++) {
       const c = list[r];
       if (c === null || (allStringIgnore && isStr(c))) continue;
