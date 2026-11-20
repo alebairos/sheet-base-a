@@ -2119,8 +2119,9 @@
   function compare(a, b) {
     if (a === EMPTYR || isLB(a)) a = null;
     if (b === EMPTYR || isLB(b)) b = null;
-    if (a === EPATH || isMV(a)) a = 0;
-    if (b === EPATH || isMV(b)) b = 0;
+    // (an array IF's empty-path element compares as an empty cell)
+    if (a === EPATH) a = null; else if (isMV(a)) a = 0;
+    if (b === EPATH) b = null; else if (isMV(b)) b = 0;
     if (a === null || a === MISSING) a = typeof b === 'string' ? '' : 0;
     if (b === null || b === MISSING) b = typeof a === 'string' ? '' : 0;
     if (typeof a === 'boolean') a = a ? 1 : 0;
@@ -2156,7 +2157,7 @@
 
   function makeCriterion(c) {
     if (isErr(c)) return c;
-    if (c === null || c === MISSING) c = 0;
+    if (c === null || c === MISSING || c === EPATH) c = 0;
     if (typeof c === 'boolean') c = c ? 1 : 0;
     if (typeof c === 'number') {
       return (v) => (typeof v === 'number' || typeof v === 'boolean') && approxEqual(+v, c);
