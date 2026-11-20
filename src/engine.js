@@ -2320,11 +2320,11 @@
   def('ROUNDUP', 1, 2, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n', 'n'], [undefined, 0]); if (isErr(a)) return a;
     let x = a[0];
-    // with a digits argument, Calc first rounds a positive non-integer to 12
-    // significant digits (tdf#124286)
+    // with a digits argument, Calc first cuts a positive non-integer to 12
+    // significant digits (tdf#124286: ROUNDUP(363136512.1386,3) is .138)
     if (nodes.length > 1 && x > 0 && Math.trunc(a[1]) < 12 && x % 1 !== 0) {
       const t = Math.floor(approxValue(Math.log10(x))) + 1 - 12;
-      x = Math.round(Math.pow(10, -t) * x) * Math.pow(10, t);
+      x = Math.floor(approxValue(Math.pow(10, -t) * x)) * Math.pow(10, t);
     }
     return roundTo(x, a[1], 1);
   });
