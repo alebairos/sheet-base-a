@@ -1,0 +1,15 @@
+=-INDEX(A1:A5,5)
+=--INDEX(A1:A5,5)
+=-IF(1,A5)
+=-(A5)
+=-CHOOSE(1,A5)
+=-OFFSET(A5,0,0)
+=-IFERROR(A5,1)
+=-B5
+=-INDEX(B1:B5,5)
+=-TRUE
+=--TRUE
+=-(1=1)
+=-NOT(B5)
+=-AND(A5)
+=-MAX(A5)

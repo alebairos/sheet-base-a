@@ -783,7 +783,9 @@
     }
 
     // iterate a range column-major (as Calc does); fn(value, r, c) may return false to stop
-    eachCell(rg, fn, includeBlank) {
+    // pre(r, c), given for cells that are not blank, may return true to skip
+    // a cell without computing it
+    eachCell(rg, fn, includeBlank, pre) {
       const sh = rg.sheet;
       const r2 = Math.min(rg.r2, sh.maxR), c2 = Math.min(rg.c2, sh.maxC);
       const area = (r2 - rg.r1 + 1) * (c2 - rg.c1 + 1);
@@ -794,6 +796,7 @@
         }
         list.sort((x, y) => x.c - y.c || x.r - y.r);
         for (const cell of list) {
+          if (pre && pre(cell.r, cell.c)) continue;
           const v = this.cellValue(sh, cell.r, cell.c);
           if (fn(v === EMPTYR ? 0 : v, cell.r, cell.c) === false) return;
         }
@@ -801,6 +804,7 @@
       }
       for (let c = rg.c1; c <= c2; c++) {
         for (let r = rg.r1; r <= r2; r++) {
+          if (pre && sh.cells.has(r * MAXCOL + c) && pre(r, c)) continue;
           let v = this.cellValue(sh, r, c);
           if (v === EMPTYR) v = 0;
           if (v === null && !includeBlank) continue;
@@ -1143,13 +1147,14 @@
         case 'neg': {
           let depth = 1, inner = node.a;
           while (inner.t === 'neg' || inner.t === 'paren') { if (inner.t === 'neg') depth++; inner = inner.a; }
-          const v = this.sv(inner, ctx);
+          const raw = this.ev(inner, ctx);
+          const v = this.scalar(raw, ctx);
           const n = this.toNum(v);
           if (isErr(n)) return asComputed(n);
           const r = depth % 2 ? -n : n;
           // Calc keeps the boolean number format through negation
-          // (but not for a plain cell reference)
-          if (typeof v === 'boolean' && inner.t !== 'ref' && (r === 0 || r === 1)) return r === 1;
+          // (but not for a cell reference, also one a function returns)
+          if (typeof v === 'boolean' && inner.t !== 'ref' && !(raw instanceof Range) && (r === 0 || r === 1)) return r === 1;
           return r === 0 ? 0 : r;
         }
         case 'pct': {
@@ -1330,20 +1335,23 @@
           // formula cells, booleans and error constants being one block); the
           // first error of a block stops it, a later block's error replaces
           // it, and the column's error ends the scan.
-          let prevR = -2, prevF = false, blockErr = false;
+          // (cells a block's error skips are not computed: no false cycles)
+          let prevR = -2, prevF = false, blockErr = false, pcol = -1, stop = false;
+          const pre = opts.colLastErr ? (r, c) => {
+            if (c !== pcol) { pcol = c; prevR = -2; if (err) stop = true; }
+            if (stop) return true;
+            const cell = v.sheet.cells.get(r * MAXCOL + c);
+            const f = !!cell && (cell.formula || typeof cell.raw === 'boolean' || (cell.raw !== null && typeof cell.raw === 'object'));
+            if (!(f && prevF && prevR === r - 1)) blockErr = false;
+            prevF = f; prevR = r;
+            return blockErr;
+          } : null;
           this.eachCell(v, (x, r, c) => {
-            if (c !== col) { if (err) return false; col = c; cur = []; parts.push(cur); prevR = -2; }
-            if (opts.colLastErr) {
-              const cell = v.sheet.cells.get(r * MAXCOL + c);
-              const f = !!cell && (cell.formula || typeof cell.raw === 'boolean' || (cell.raw !== null && typeof cell.raw === 'object'));
-              if (!(f && prevF && prevR === r - 1)) blockErr = false;
-              prevF = f; prevR = r;
-              if (blockErr) return true;
-            }
+            if (c !== col) { if (err) return false; col = c; cur = []; parts.push(cur); }
             if (typeof x === 'number') { nums.push(x); cur.push(x); } else if (typeof x === 'boolean') { nums.push(x ? 1 : 0); cur.push(x ? 1 : 0); }
             else if (isErr(x) && !opts.skipErrors) { err = x; blockErr = true; return !!opts.colLastErr; }
             return true;
-          });
+          }, false, pre);
           if (err) return { err };
         } else if (v instanceof Matrix) {
           for (const row of v.data) for (const x of row) {
@@ -1906,6 +1914,7 @@
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.PARAM;
     let crit = self.sv(nodes[1], ctx);
     if (crit === MISSING || isLB(crit)) crit = null;
+    if (crit === EMPTYR) crit = 0;
     const match = makeCriterion(crit);
     if (isErr(match)) return match;
     let sum = rg;
@@ -2434,6 +2443,7 @@
       if (!(rg instanceof Range)) return E.VALUE;
       let crit = self.sv(nodes[i + 1], ctx);
       if (crit === MISSING || isLB(crit)) crit = null;
+    if (crit === EMPTYR) crit = 0;
       const m = makeCriterion(crit);
       if (isErr(m)) return m;
       pairs.push([rg, m]);
@@ -2492,7 +2502,7 @@
     if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
     if (row < 1 || row > tbl.rows) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
-    if (v === null) v = ''; else if (isLB(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
+    if (v === null) v = ''; else if (isLB(v) || v === EMPTYR) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const i = lookupPos(this.firstLine(tbl, true), v, sorted ? 1 : 0, tbl instanceof Range ? 'row' : null);
     if (i < 0) return E.NA;
     let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + row - 1, tbl.c1 + i) : tbl.data[row - 1][i];
@@ -2516,7 +2526,7 @@
     if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
     if (col < 1 || col > tbl.cols) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
-    if (v === null) v = ''; else if (isLB(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
+    if (v === null) v = ''; else if (isLB(v) || v === EMPTYR) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const first = this.firstLine(tbl, false);
     const i = lookupPos(first, v, sorted ? 1 : 0, tbl instanceof Range ? 'col' : null);
     if (i < 0) return E.NA;
@@ -2543,7 +2553,7 @@
     if (rg instanceof RefList) return E.VALUE;
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.NA;
     if (rg.rows !== 1 && rg.cols !== 1) return E.PARAM;
-    if (v === null) v = ''; else if (isLB(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
+    if (v === null) v = ''; else if (isLB(v) || v === EMPTYR) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const list = this.firstLine(rg, rg.cols !== 1);
     const i = lookupPos(list, v, mode, rg instanceof Range ? (rg.cols === 1 ? 'col' : 'row') : null, true);
     return i < 0 ? E.NA : i + 1;
