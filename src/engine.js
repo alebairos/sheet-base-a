@@ -1322,6 +1322,14 @@
     }
     aev1x(node, ctx, sc) {
       const lit = (x) => (x === MISSING ? { t: 'missing' } : { t: 'lit', v: x });
+      // (computed again as a scalar formula part when no array came out: the
+      // error functions met on the way have not run yet)
+      const efD = this.efDone, efN = this.efSeen ? this.efSeen.size : 0;
+      const again = () => {
+        if (!this.efSeen) return;
+        this.efDone = efD;
+        if (this.efSeen.size > efN) this.efSeen = new Set([...this.efSeen].slice(0, efN));
+      };
       // In an ordinary formula (sc) an array made by a function ("jm") reaches
       // another function's scalar parameter as its first element only, as in
       // Calc; operators still apply element by element.
@@ -1342,7 +1350,7 @@
         }
         case 'neg': case 'pct': {
           const a = this.aev(node.a, ctx, sc);
-          if (!(a instanceof Matrix)) return this.ev0(node, ctx);
+          if (!(a instanceof Matrix)) { again(); return this.ev0(node, ctx); }
           return jmOf(this.amap([a], (x) => this.ev({ t: node.t, a: lit(x) }, ctx)), [a]);
         }
         case 'bin': {
@@ -1430,7 +1438,7 @@
                 first = this.aevPost(m, ctx, sc);
               } else first = this.aevPost(raw, ctx, sc);
             } else first = node.args[0].t === 'missing' ? MISSING : this.aev(node.args[0], ctx, sc);
-            if (!(first instanceof Matrix)) { this.pend = pend0; return mark(this.ev0(node, ctx)); }
+            if (!(first instanceof Matrix)) { this.pend = pend0; again(); return mark(this.ev0(node, ctx)); }
             // a branch no element takes leaves no pending error behind
             const used = (k) => first.data.some((row) => row.some((x) => {
               if (name === 'IFERROR') return k === 1 && isErr(x);
@@ -1618,7 +1626,7 @@
                 if (n && n.t === 'ref' && n.b && (n.a.r !== n.b.r || n.a.c !== n.b.c)) { const v = this.aev(n, ctx, false, true); args[k] = LOOKUPS.has(name) ? v : one(v); }
               });
             }
-            if (!args.some((m) => m instanceof Matrix)) return mark(this.ev0(node, ctx));
+            if (!args.some((m) => m instanceof Matrix)) { again(); return mark(this.ev0(node, ctx)); }
             // (a computed error as the range or sum range of SUMIF/COUNTIF/
             // AVERAGEIF is the formula's error, not each element's:
             // SUMPRODUCT(SUMIF(1/0,A1:A3),{1;2}) is #DIV/0!)
@@ -1699,7 +1707,7 @@
             // POWER is Calc's ^ operator: over arrays it follows ^
             const r = this.aev1({ t: 'bin', op: '^', a: node.args[0], b: node.args[1], fnPow: true }, ctx, sc);
             if (r instanceof Matrix) return mark(r);
-            return mark(this.ev0(node, ctx));
+            again(); return mark(this.ev0(node, ctx));
           }
           // when another argument is an array, a range argument is taken as
           // an array too (not intersected), except for POWER (Calc's ^)
@@ -1738,7 +1746,7 @@
           });
           if (!args.some((m) => m instanceof Matrix)) {
             if (collapsed) return asComputed(this.call({ t: 'fn', name, args: args.map(lit) }, ctx));
-            return mark(this.ev0(node, ctx));
+            again(); return mark(this.ev0(node, ctx));
           }
           if (name === 'NOT' && args.length === 1) {
             // Calc's matrix NOT: an error or text that is not a number gives 0
