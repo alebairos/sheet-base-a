@@ -43,6 +43,13 @@
     if (!ETOK[code]) { ETOK[code] = new FErr(code, true); ETOK[code].tok = true; }
     return ETOK[code];
   };
+  // the error token of an earlier parameter (popped later) replaces a
+  // conversion error met in parameter k
+  const tokBefore = (vals, k, e) => {
+    if (e && e.tok) return e;
+    for (let j = 0; j < k; j++) if (isErr(vals[j]) && vals[j].tok) return vals[j];
+    return e;
+  };
   const asComputed = (v) => (isErr(v) && v.fromRef ? errByCode(v.code) : v);
 
   // ---------------------------------------------------------------- helpers
@@ -1272,7 +1279,7 @@
           case 'b': r = this.toBool(v); break;
           default: r = v;
         }
-        if (isErr(r)) return r;
+        if (isErr(r)) return tokBefore(vals, i, r);
         if (checks && checks[i] && r !== undefined) { const e = checks[i](r); if (e) return e; }
         out[i] = r;
       }
@@ -1334,7 +1341,7 @@
           }
         } else if (typeof v === 'number') { nums.push(v); } else if (typeof v === 'boolean') { nums.push(v ? 1 : 0); } else if (v === EMPTYR) { nums.push(0); } else if (isErr(v)) { if (!opts.skipErrors) return { err: v }; } else if (typeof v === 'string') {
           const n = textToNum(v);
-          if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: opts.textParam ? E.PARAM : E.VALUE };
+          if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: tokBefore(opts.forward || opts.noTok ? [] : vals, k, opts.textParam ? E.PARAM : E.VALUE) };
         }
         if (parts[parts.length - 1] === nums) parts[parts.length - 1] = nums.slice(n0);
         else if (nums.length > n0 && !(v instanceof Range)) parts.push(nums[n0]);
@@ -1721,7 +1728,7 @@
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }, { forward: true, textParam: true }, 1);
   // variance: values in Calc's order (parameters last to first, cells first to last)
-  aggregate('STDEV', (n, b, parts) => (n.length < 2 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), false))), { textParam: true });
+  aggregate('STDEV', (n, b, parts) => (n.length < 2 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), false))), { textParam: true, noTok: true });
 
   const variance = (n, pop) => {
     const mean = kahan(n) / n.length;
@@ -1729,9 +1736,9 @@
     for (const x of n) { const d = approxSub(x, mean); ss += d * d; } // rtl::math::approxSub
     return ss / (n.length - (pop ? 0 : 1));
   };
-  aggregate('VAR', (n, b, parts) => (n.length < 2 ? E.DIV0 : variance(popOrder(parts), false)), { textParam: true });
-  aggregate('VARP', (n, b, parts) => (n.length < 1 ? E.DIV0 : variance(popOrder(parts), true)), { textParam: true });
-  aggregate('STDEVP', (n, b, parts) => (n.length < 1 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), true))), { textParam: true });
+  aggregate('VAR', (n, b, parts) => (n.length < 2 ? E.DIV0 : variance(popOrder(parts), false)), { textParam: true, noTok: true });
+  aggregate('VARP', (n, b, parts) => (n.length < 1 ? E.DIV0 : variance(popOrder(parts), true)), { textParam: true, noTok: true });
+  aggregate('STDEVP', (n, b, parts) => (n.length < 1 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), true))), { textParam: true, noTok: true });
   const kth = (largest) => function (nodes, ctx) {
     if (nodes.length !== 2) return E.VALUE;
     const r = this.collect([nodes[0]], ctx, { textParam: true });
@@ -1988,13 +1995,14 @@
   function logical(name, init, combine) {
     def(name, 1, undefined, function (nodes, ctx) {
       let acc = init, any = false;
-      const vals = [];
+      const vals = [], clrs = [];
       for (const node of nodes) {
-        if (node.t === 'missing') { vals.push(false); continue; } // an empty argument is FALSE
+        if (node.t === 'missing') { vals.push(false); clrs.push(undefined); continue; } // an empty argument is FALSE
         const v = this.ev(node, ctx);
-        if (isErr(v) && !v.fromRef) return v;
-        vals.push(v);
+        vals.push(v); clrs.push(this.clr);
       }
+      for (let k = 0; k < vals.length; k++) if (clrs[k] !== undefined && clrs[k] !== this.clr) vals[k] = demote(vals[k]);
+      for (const v of vals) if (isErr(v) && !v.fromRef) return v;
       // parameters are examined last to first, as Calc pops them
       for (let k = vals.length - 1; k >= 0; k--) {
         const v = vals[k];
