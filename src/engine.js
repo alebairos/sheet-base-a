@@ -2178,8 +2178,13 @@
         for (let j = 0; j < k; j++) if (isErr(vals[j]) && vals[j].tok) return vals[j];
         return e;
       };
+      // (MIN/MAX: an array's error is Calc's last value examined, so it
+      // stands unless a parameter examined after it gives a number)
+      let skipErr = null;
       for (let j = 0; j < vals.length; j++) {
         const k = opts.forward ? j : vals.length - 1 - j;
+        if (opts.arrErrSkip && j > 0 && nums.length > (vals.nBefore || 0)) skipErr = null;
+        vals.nBefore = nums.length;
         const v = vals[k];
         const n0 = nums.length;
         if (v instanceof Matrix) parts.push(nums); // placeholder, fixed below
@@ -2230,7 +2235,12 @@
         } else if (v instanceof Matrix) {
           // (MIN/MAX: an array holding an error, other than the first
           // parameter, is passed over whole, as Calc's matrix minimum is NaN)
-          if (opts.arrErrSkip && k > 0 && v.data.some((row) => row.some(isErr))) continue;
+          if (opts.arrErrSkip && k > 0 && v.data.some((row) => row.some(isErr))) {
+            let e = null;
+            for (let c = 0; c < v.cols && !e; c++) for (let r = 0; r < v.rows; r++) if (isErr(v.data[r][c])) { e = v.data[r][c]; break; }
+            skipErr = e;
+            continue;
+          }
           // (and an array of empty elements only counts as 0)
           // (an array of only text or empty elements, too)
           if (opts.arrErrSkip && v.data.every((row) => row.every((x) => x === null || typeof x === 'string'))) { nums.push(0); continue; }
@@ -2259,6 +2269,8 @@
         if (parts[parts.length - 1] === nums) parts[parts.length - 1] = nums.slice(n0);
         else if (nums.length > n0 && !(v instanceof Range)) parts.push(nums[n0]);
       }
+      if (opts.arrErrSkip && nums.length > (vals.nBefore || 0)) skipErr = null;
+      if (skipErr) return { err: skipErr };
       if (!opts.forward) nums.reverse();
       // MIN/MAX take the number format of the first number met in parameter
       // order (text and blank cells skipped): a boolean cell makes the result
