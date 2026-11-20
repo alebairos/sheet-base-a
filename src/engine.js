@@ -824,7 +824,7 @@
 
     finalValue(v, ctx) {
       if (v instanceof Range) v = this.intersect(v, ctx);
-      else if (v instanceof Matrix) v = m00(v);
+      else if (v instanceof Matrix) { const b = v.boolRes; v = m00(v); if (b && (v === 0 || v === 1)) v = v === 1; }
       else if (v instanceof RefList) {
         // a 3D reference as the result: the formula's own sheet's range, if
         // it is among the sheets (inside operations it is an error)
@@ -995,8 +995,8 @@
     // operators and scalar functions apply element by element
     // sc: ranges are intersected with the formula cell (an ordinary formula
     // whose inline arrays still compute element by element)
-    aev(node, ctx, sc) {
-      let v = this.aev1(node, ctx, sc);
+    aev(node, ctx, sc) { return this.aevPost(this.aev1(node, ctx, sc), ctx, sc); }
+    aevPost(v, ctx, sc) {
       if (v instanceof Range) v = sc ? this.intersect(v, ctx) : this.rangeMatrix(v);
       // a scalar error met among array operations stays pending (Calc's
       // nGlobalError): it is the formula's result unless a reset follows
@@ -1021,6 +1021,8 @@
       // Calc; operators still apply element by element.
       const one = (m) => (sc && m instanceof Matrix && m.jm ? m00(m) : m);
       const mark = (m) => { if (sc && m instanceof Matrix && !m.jm) { const e = m.epm; m = new Matrix(m.data); m.jm = true; if (e) m.epm = e; } return m; };
+      // (NOT's array: numbers inside, but as a formula's result shown as a boolean)
+      const markBool = (m) => { m = mark(m); if (m instanceof Matrix) m.boolRes = true; return m; };
       const jmOf = (r, ms) => { if (sc) r.jm = ms.filter((m) => m instanceof Matrix).every((m) => m.jm); return r; };
       switch (node.t) {
         case 'paren': {
@@ -1069,12 +1071,12 @@
           if (cmpOp) { const e = [a, b].find((v) => !(v instanceof Matrix) && isErr(v)); if (e) return e.lit ? errByCode(e.code) : e; }
           // Calc's matrix division checks the divisor first: a zero divisor
           // is #DIV/0! whatever the dividend (an error, or text beside a
-          // scalar divisor); an error to the power 0 is 1
+          // scalar divisor); an error to the power 0 and 1 to an error are 1
           const bothMat = a instanceof Matrix && b instanceof Matrix;
           const zero = (y) => y === 0 || y === false || y === null || y === EMPTYR || isLB(y);
           return jmOf(this.amap([a, b], (x, y) => {
             if (op === '/' && zero(y) && (isErr(x) || (!bothMat && typeof x === 'string'))) return E.DIV0;
-            if (op === '^' && bothMat && zero(y) && isErr(x)) return 1;
+            if (op === '^' && bothMat && ((zero(y) && isErr(x)) || ((x === 1 || x === true) && isErr(y)))) return 1;
             return asComputed(this.binop({ op, a: lit(x), b: lit(y) }, ctx));
           }, cmpOp), [a, b]);
         }
@@ -1134,7 +1136,7 @@
             const args = mp.map((i) => {
               if (i >= node.args.length || node.args[i].t === 'missing') return null;
               const v = this.aev(node.args[i], ctx, sc);
-              return name === 'MATCH' ? v : one(v);
+              return LOOKUPS.has(name) ? v : one(v);
             });
             if (!args.some((m) => m instanceof Matrix)) return mark(this.ev0(node, ctx));
             return mark(this.amap(args, (...xs) => {
@@ -1167,7 +1169,15 @@
           // (NOT takes a function-made array whole: Calc's NOT handles arrays itself)
           // (beside an inline array, a function-made array is taken whole too)
           const inl = raws.some((v) => v instanceof Matrix && !v.jm);
-          const one1 = (v) => (name === 'NOT' || inl ? v : one(v));
+          // (the first element taken from a function-made array is an element:
+          // its error is an operand like a cell's, not a pending error)
+          let collapsed = false;
+          const one1 = (v) => {
+            if (name === 'NOT' || inl) return v;
+            const o = one(v);
+            if (o !== v) { collapsed = true; return asRefErr(o); }
+            return o;
+          };
           const anyMat = raws.some((v) => one1(v) instanceof Matrix);
           const args = raws.map((v) => {
             if (v instanceof Range) v = (!sc || (anyMat && name !== 'POWER')) && (v.rows > 1 || v.cols > 1) ? this.rangeMatrix(v) : this.intersect(v, ctx);
@@ -1175,10 +1185,13 @@
             if (isErr(v) && !v.fromRef && !this.pend) this.pend = { err: v, clr: this.clr };
             return v;
           });
-          if (!args.some((m) => m instanceof Matrix)) return mark(this.ev0(node, ctx));
+          if (!args.some((m) => m instanceof Matrix)) {
+            if (collapsed) return asComputed(this.call({ t: 'fn', name, args: args.map(lit) }, ctx));
+            return mark(this.ev0(node, ctx));
+          }
           if (name === 'NOT' && args.length === 1) {
             // Calc's matrix NOT: an error or text that is not a number gives 0
-            return mark(this.amap(args, (x) => (isErr(x) || (typeof x === 'string' && textToNum(x) === null) ? 0 : asComputed(this.call({ t: 'fn', name, args: [lit(x)] }, ctx)))));
+            return markBool(this.amap(args, (x) => (isErr(x) || (typeof x === 'string' && textToNum(x) === null) ? 0 : asComputed(this.call({ t: 'fn', name, args: [lit(x)] }, ctx)))));
           }
           // as large as the largest argument, #VALUE! where one lacks the position
           // (Calc's MOD pops the divisor first: 0 is #DIV/0! whatever the dividend)
@@ -1242,7 +1255,11 @@
     // a formula part holding an inline array ({1,2}*2, LEN({"a","bb"})) is
     // computed element by element even outside array functions, as in Calc
     ev(node, ctx) {
-      if ((node.t === 'bin' || node.t === 'neg' || node.t === 'pct' || node.t === 'fn') && hasArr(node)) return this.aev(node, ctx, true);
+      if ((node.t === 'bin' || node.t === 'neg' || node.t === 'pct' || node.t === 'fn') && hasArr(node)) {
+        // (a function that gives a reference, IF(1,A4,{1,2}), still gives one)
+        if (node.t === 'fn') { const v = this.aev1(node, ctx, true); if (v instanceof Range) return v; return this.aevPost(v, ctx, true); }
+        return this.aev(node, ctx, true);
+      }
       return this.ev0(node, ctx);
     }
     // errSeen: a computed error came out of a part of the formula evaluated
@@ -1616,7 +1633,19 @@
           // parameter, is passed over whole, as Calc's matrix minimum is NaN)
           if (opts.arrErrSkip && k > 0 && v.data.some((row) => row.some(isErr))) continue;
           // (and an array of empty elements only counts as 0)
-          if (opts.arrErrSkip && v.data.every((row) => row.every((x) => x === null))) { nums.push(0); continue; }
+          // (an array of only text or empty elements, too)
+          if (opts.arrErrSkip && v.data.every((row) => row.every((x) => x === null || typeof x === 'string'))) { nums.push(0); continue; }
+          if (opts.kahanErr) {
+            // (SUM/AVERAGE: Calc's Kahan sum goes column by column and adds
+            // the held-back last non-zero term last, so an error there wins
+            // over the first error met)
+            let first = null, last = null;
+            for (let c = 0; c < v.cols; c++) for (let r = 0; r < v.rows; r++) {
+              const x = v.data[r][c];
+              if (isErr(x)) { if (!first) first = x; last = x; } else if ((typeof x === 'number' && x !== 0) || x === true) last = null;
+            }
+            if (first) return { err: last || first };
+          }
           for (const row of v.data) for (const x of row) {
             if (typeof x === 'number') { nums.push(x); } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
             else if (isErr(x) && !opts.skipErrors) return { err: x };
@@ -2001,9 +2030,9 @@
   const sumParts = (parts) => kahan(parts.map((p) => (Array.isArray(p) ? sumArray(p) : p)));
   // SUM scans a range column by column: the first column holding an error
   // reports the last error in that column (Calc's per-column sum)
-  aggregate('SUM', (n, b, parts) => finite(sumParts(parts)), { colLastErr: true });
+  aggregate('SUM', (n, b, parts) => finite(sumParts(parts)), { colLastErr: true, kahanErr: true });
   // AVERAGE adds every value to one Kahan sum (no per-column sums)
-  aggregate('AVERAGE', (n, b, parts) => (n.length ? finite(kahan(popOrder(parts)) / n.length) : E.DIV0), { colCont: true });
+  aggregate('AVERAGE', (n, b, parts) => (n.length ? finite(kahan(popOrder(parts)) / n.length) : E.DIV0), { colCont: true, kahanErr: true });
   const asFmt = (x, b) => (b && (x === 0 || x === 1) ? x === 1 : x);
   aggregate('MIN', (n, b) => (n.length ? asFmt(Math.min(...n), b) : 0), { textParam: true, arrErrSkip: true }, 1);
   aggregate('MAX', (n, b) => (n.length ? asFmt(Math.max(...n), b) : 0), { textParam: true, arrErrSkip: true }, 1);
