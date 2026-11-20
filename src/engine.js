@@ -1052,9 +1052,10 @@
     // iterate a range column-major (as Calc does); fn(value, r, c) may return false to stop
     // pre(r, c), given for cells that are not blank, may return true to skip
     // a cell without computing it
-    eachCell(rg, fn, includeBlank, pre) {
+    // (ext: blank cells are visited up to that last row and column too)
+    eachCell(rg, fn, includeBlank, pre, ext) {
       const sh = rg.sheet;
-      const r2 = Math.min(rg.r2, sh.maxR), c2 = Math.min(rg.c2, sh.maxC);
+      const r2 = Math.min(rg.r2, Math.max(sh.maxR, ext ? ext[0] : -1)), c2 = Math.min(rg.c2, Math.max(sh.maxC, ext ? ext[1] : -1));
       const area = (r2 - rg.r1 + 1) * (c2 - rg.c1 + 1);
       if (!includeBlank && area > 4 * sh.cells.size + 64) {
         const list = [];
@@ -2870,7 +2871,13 @@
       else if (isErr(sv)) { err = sv; return false; }
       return true;
     };
-    self.eachCell(a.rg, visit, blankMatches && a.sum !== a.rg);
+    // (blank criteria cells past the data still pick sum cells that hold values)
+    let ext;
+    if (blankMatches && a.sum !== a.rg) {
+      ext = a.sum instanceof Matrix ? [a.rg.r1 + a.sum.rows - 1, a.rg.c1 + a.sum.cols - 1]
+        : [a.rg.r1 + a.sum.sheet.maxR - a.sum.r1, a.rg.c1 + a.sum.sheet.maxC - a.sum.c1];
+    }
+    self.eachCell(a.rg, visit, blankMatches && a.sum !== a.rg, undefined, ext);
     return err ? { err } : { nums };
   }
   def('SUMIF', 2, 3, function (nodes, ctx) {
