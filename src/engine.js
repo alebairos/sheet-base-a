@@ -552,6 +552,7 @@
     }
     setCell(sh, r, c, raw, addr) {
       const key = r * MAXCOL + c;
+      sh.fcols = null; // formula-cell index used by the dependency scan
       // an empty text constant is an empty cell (as after an xlsx round trip)
       if (raw === null || raw === undefined || raw === '') { sh.cells.delete(key); return; }
       const cell = { r, c, raw, addr: addr || addrName(r, c), state: 0, value: null, ast: null };
