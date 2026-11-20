@@ -909,6 +909,14 @@
     sheet(name) { return this.byName.get(String(name).toUpperCase()) || null; }
   }
 
+  // a reference written out (A1, Sheet2!A1:B2, (A1), A1:B2 B2, (A1,B1)), not one a function gives
+  const staticRef = (n) => {
+    while (n.t === 'paren') n = n.a;
+    if (n.t === 'ref' || n.t === 'ref3d') return true;
+    if (n.t === 'rangeop' || n.t === 'isect') return staticRef(n.a) && staticRef(n.b);
+    if (n.t === 'union') return n.args.every(staticRef);
+    return false;
+  };
   // ---------------------------------------------------------------- evaluator
   class Engine {
     constructor(json) {
@@ -1810,14 +1818,21 @@
           return new Range(a.sheet, r1, c1, r2, c2);
         }
         case 'union': {
+          // (an operand that is not a plain reference, INDEX(..) or IF(..),
+          // makes the list #VALUE! in LibreOffice)
+          // (it fails the whole formula, past IFERROR, ISERROR or COUNT, after
+          // the operands' errors unless the formula goes on past them
+          // (COUNT((A1,1/0)) is #VALUE!); a nested list counts as such an operand)
+          const ok = node.args.every((n) => { while (n.t === 'paren') n = n.a; return n.t !== 'union' && staticRef(n); });
           const ranges = [];
           for (const n of node.args) {
             const v = this.ev(n, ctx);
-            if (isErr(v)) return v;
+            if (isErr(v)) { if (ok || !(this.efDone < this.efTotal)) return v; throw new JumpAbort(E.VALUE); }
             if (v instanceof Range) ranges.push(v);
             else if (v instanceof RefList) ranges.push(...v.ranges);
-            else return E.VALUE;
+            else if (ok) return E.VALUE;
           }
+          if (!ok) throw new JumpAbort(E.VALUE);
           return new RefList(ranges);
         }
         case 'rangeop': {
@@ -1826,6 +1841,19 @@
           if (isErr(b)) return b;
           if (a instanceof Range && b instanceof Range && a.sheet === b.sheet) {
             return new Range(a.sheet, Math.min(a.r1, b.r1), Math.min(a.c1, b.c1), Math.max(a.r2, b.r2), Math.max(a.c2, b.c2));
+          }
+          // (with a function's reference on either side, as LibreOffice
+          // extends the first: the range is on the first one's sheet, on the
+          // second's when that is a range written out (INDEX(Sheet2!A1:A3,1):A2:A3
+          // is Sheet1!A1:A3), across the sheets when it is a cell written with
+          // its sheet (INDEX(A1:A3,1):Sheet2!A2 is Sheet1:Sheet2!A1:A2))
+          if (a instanceof Range && b instanceof Range && !(staticRef(node.a) && staticRef(node.b))) {
+            let bn = node.b; while (bn.t === 'paren') bn = bn.a;
+            const single = bn.t === 'ref' && !bn.b;
+            if (!(staticRef(bn) && single && bn.sheet !== null && bn.sheet !== undefined)) {
+              const sh = staticRef(bn) && !single ? b.sheet : a.sheet;
+              return new Range(sh, Math.min(a.r1, b.r1), Math.min(a.c1, b.c1), Math.max(a.r2, b.r2), Math.max(a.c2, b.c2));
+            }
           }
           // across sheets (Sheet1!A1:Sheet2!B2): a 3D reference over the
           // sheets between, in workbook order
