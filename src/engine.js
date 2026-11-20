@@ -1305,6 +1305,8 @@
           // (brackets do not consume an error: no pending error of their own)
           let v = this.aev1(node.a, ctx, sc);
           let u = node.a; while (u.t === 'paren') u = u.a; // (a single cell reference stays a scalar)
+          // (so does the one cell a function gives: (INDEX(A5,0)), (IF(1,A5)))
+          if (v instanceof Range && u.t === 'fn' && !sc && (v.single || ((u.name === 'INDEX' || u.name === 'OFFSET') && v.rows === 1 && v.cols === 1))) return v;
           if (v instanceof Range) v = sc || (u.t === 'ref' && !u.b) ? this.intersect(v, ctx) : this.rangeMatrix(v);
           return v;
         }
@@ -1526,6 +1528,8 @@
                 if (!isErr(n) && !(pick >= 1 && pick < xs.length)) return E.IARG;
               } else pick = isErr(xs[0]) ? 1 : 0;
               if (pick && xs[pick] === AMISS) return E.NA;
+              // (an empty-path element a jump copies from a branch is empty text)
+              if (pick && xs[pick] === EPATH) return '';
               // (an IF with only a condition gives the number 1 where it holds)
               if (name === 'IF' && xs.length === 1 && pick === 1) return 1;
               xs = xs.map((x) => (x === AMISS ? null : x));
