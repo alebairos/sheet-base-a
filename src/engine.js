@@ -972,7 +972,7 @@
           const one1 = (v) => (name === 'NOT' ? v : one(v));
           const anyMat = raws.some((v) => one1(v) instanceof Matrix);
           const args = raws.map((v) => {
-            if (v instanceof Range) v = !sc || (anyMat && name !== 'POWER') ? this.rangeMatrix(v) : this.intersect(v, ctx);
+            if (v instanceof Range) v = (!sc || (anyMat && name !== 'POWER')) && (v.rows > 1 || v.cols > 1) ? this.rangeMatrix(v) : this.intersect(v, ctx);
             else v = one1(v);
             if (isErr(v) && !v.fromRef && !this.pend) this.pend = { err: v, clr: this.clr };
             return v;
