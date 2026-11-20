@@ -755,7 +755,16 @@
     // ---- function calls
     call(node, ctx) {
       const f = FUNCS[node.name];
-      if (!f) return node.args.length ? UNKNOWN_FN : E.NAME;
+      if (!f) {
+        if (!node.args.length) return E.NAME;
+        // the arguments are still computed: a computed error among them wins
+        for (const a of node.args) {
+          if (a.t === 'missing') continue;
+          const v = this.ev(a, ctx);
+          if (isErr(v) && !v.fromRef && v !== UNKNOWN_FN) return v;
+        }
+        return UNKNOWN_FN;
+      }
       const n = node.args.length;
       if (n < f.min || (f.max !== undefined && n > f.max)) return E.VALUE;
       return f.fn.call(this, node.args, ctx);
@@ -1136,6 +1145,27 @@
     return Math.sqrt(ss / (n.length - 1));
   });
 
+  const variance = (n, pop) => {
+    const mean = kahan(n) / n.length;
+    return kahan(n.map((x) => (x - mean) * (x - mean))) / (n.length - (pop ? 0 : 1));
+  };
+  aggregate('VAR', (n) => (n.length < 2 ? E.DIV0 : variance(n, false)));
+  aggregate('VARP', (n) => (n.length < 1 ? E.DIV0 : variance(n, true)));
+  aggregate('STDEVP', (n) => (n.length < 1 ? E.DIV0 : Math.sqrt(variance(n, true))));
+  const kth = (largest) => function (nodes, ctx) {
+    if (nodes.length !== 2) return E.VALUE;
+    const r = this.collect([nodes[0]], ctx, {});
+    if (r.err) return r.err;
+    const a = this.args([nodes[1]], ctx, ['v']); if (isErr(a)) return a;
+    if (typeof a[0] === 'string') return E.VALUE;
+    const k = Math.ceil(approxValue(+a[0]));
+    if (k < 1 || k > r.nums.length) return E.VALUE;
+    const s = r.nums.slice().sort((x, y) => (largest ? y - x : x - y));
+    return s[k - 1];
+  };
+  def('LARGE', 2, 2, kth(true));
+  def('SMALL', 2, 2, kth(false));
+
   def('COUNTA', 0, undefined, function (nodes, ctx) {
     let n = 0;
     for (const node of nodes) {
@@ -1190,9 +1220,10 @@
     const x = this.toNum(vals[0]); if (isErr(x)) return x;
     const q = x / y;
     if (!isFinite(q)) return E.NUM;
-    let r = approxSub(x, approxFloor(q) * y);
-    if (r !== 0 && (r < 0) !== (y < 0)) r += y;
-    return r;
+    const r = approxSub(x, approxFloor(q) * y);
+    // a result that rounding pushed outside [0, y) is an invalid argument
+    if ((y > 0 && r >= 0 && r < y) || (y < 0 && r <= 0 && r > y)) return r;
+    return E.VALUE;
   });
   def('ABS', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n']); if (isErr(a)) return a;
@@ -1202,6 +1233,60 @@
     const a = this.args(nodes, ctx, ['n', 'n']); if (isErr(a)) return a;
     return power(a[0], a[1]);
   });
+  const math1 = (name, fn) => def(name, 1, 1, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['n']); if (isErr(a)) return a;
+    const r = fn(a[0]);
+    return typeof r === 'number' && !isFinite(r) ? E.NUM : r;
+  });
+  math1('EXP', (x) => Math.exp(x));
+  math1('LN', (x) => (x <= 0 ? E.VALUE : Math.log(x)));
+  math1('LOG10', (x) => (x <= 0 ? E.VALUE : Math.log10(x)));
+  math1('FACT', (x) => {
+    x = Math.floor(x);
+    if (x < 0) return E.VALUE;
+    let f = 1;
+    for (let i = 2; i <= x && isFinite(f); i++) f *= i;
+    return isFinite(f) ? f : E.VALUE;
+  });
+  const parity = (odd) => function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['v']); if (isErr(a)) return a;
+    if (a[0] === null || a[0] === EMPTYR) return E.VALUE;
+    const x = this.toNum(a[0]); if (isErr(x)) return x;
+    return Math.abs(Math.trunc(x)) % 2 === (odd ? 1 : 0);
+  };
+  def('ISODD', 1, 1, parity(true));
+  def('ISEVEN', 1, 1, parity(false));
+  math1('EVEN', (x) => { const c = Math.ceil(Math.abs(approxValue(x)) / 2) * 2; return x < 0 ? -c : c; });
+  math1('ODD', (x) => { let c = Math.ceil(Math.abs(approxValue(x))); if (c % 2 === 0) c++; return x < 0 ? -c : c; });
+  def('LOG', 1, 2, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['n', 'n'], [undefined, 10]); if (isErr(a)) return a;
+    if (a[0] <= 0 || a[1] <= 0 || a[1] === 1) return E.VALUE;
+    return Math.log(a[0]) / Math.log(a[1]);
+  });
+  def('QUOTIENT', 2, 2, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['n', 'n']); if (isErr(a)) return a;
+    if (a[1] === 0) return E.VALUE;
+    return Math.trunc(approxValue(a[0] / a[1]));
+  });
+  const toMultiple = (up) => function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['n', 'n']); if (isErr(a)) return a;
+    const [x, m] = a;
+    if (m === 0) return up ? 0 : E.VALUE;
+    if (x === 0) return 0;
+    if (x > 0 && m < 0) return E.VALUE;
+    const q = approxValue(x / m);
+    return approxValue((up ? Math.ceil(q) : Math.floor(q)) * m);
+  };
+  def('CEILING', 2, 2, toMultiple(true));
+  def('FLOOR', 2, 2, toMultiple(false));
+  def('RAND', 0, 0, () => Math.random());
+  def('RANDBETWEEN', 2, 2, function (nodes, ctx) {
+    const a = this.args(nodes, ctx, ['n', 'n']); if (isErr(a)) return a;
+    const lo = Math.ceil(a[0]), hi = Math.floor(a[1]);
+    if (lo > hi) return E.VALUE;
+    return lo + Math.floor(Math.random() * (hi - lo + 1));
+  });
+
   def('SQRT', 1, 1, function (nodes, ctx) {
     const a = this.args(nodes, ctx, ['n']); if (isErr(a)) return a;
     if (a[0] < 0) return E.VALUE;
