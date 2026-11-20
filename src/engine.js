@@ -191,7 +191,8 @@
     if (x === 0 || Object.is(x, -0)) return '0';
     if (!isFinite(x)) return '#NUM!';
     if (Number.isInteger(x) && Math.abs(x) < 9007199254740992) return String(x); // exact below 2^53
-    let s = exp15(x); // 15 significant digits
+    // 15 significant digits (all of them when 15 would round past the largest double)
+    let s = isFinite(Number(exp15(x))) ? exp15(x) : x.toExponential();
     let [mant, exp] = s.split('e');
     let e = parseInt(exp, 10);
     // fixed or scientific follows the magnitude before rounding
@@ -2545,7 +2546,6 @@
     if (y === 0) return E.DIV0;
     const x = this.toNum(vals[0]); if (isErr(x)) return x;
     const q = x / y;
-    if (!isFinite(q)) return E.NUM;
     const r = approxSub(x, approxFloor(q) * y);
     // a result that rounding pushed outside [0, y) is an invalid argument
     if ((y > 0 && r >= 0 && r < y) || (y < 0 && r <= 0 && r > y)) return r;
