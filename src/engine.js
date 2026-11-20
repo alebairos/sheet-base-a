@@ -1067,6 +1067,7 @@
     }
     // a computed error stays pending, or is a token if Calc goes on past it (contErr)
     notePend(v) {
+      if (this.inElem && this.fa) return v; // (an element's error, in a force-array context)
       if (isErr(v) && !v.fromRef && !v.tok) { const t = this.contErr(v); if (t) return t; }
       if (isErr(v) && !v.fromRef && !this.pend) this.pend = { err: v, clr: this.clr };
       return v;
@@ -1344,7 +1345,8 @@
     ev(node, ctx) {
       if (this.fa && (node.t === 'bin' || node.t === 'neg' || node.t === 'pct' || node.t === 'fn')) {
         const v = this.aev1(node, ctx, false);
-        return v instanceof Range ? v : this.aevPost(v, ctx, false);
+        // (inside an element's computation an error is the element's, not pending)
+        return v instanceof Range || this.inElem ? v : this.aevPost(v, ctx, false);
       }
       if ((node.t === 'bin' || node.t === 'neg' || node.t === 'pct' || node.t === 'fn') && hasArr(node)) {
         // (a function that gives a reference, IF(1,A4,{1,2}), still gives one)
@@ -2008,6 +2010,47 @@
   // approximation. On sorted data all agree with Calc.
   // numsBelowText (MATCH over an inline array): in an ascending search numbers
   // are below a text value
+  // Calc's MATCH over an array (ScMatch, lcl_CompareMatrix2Query): a binary
+  // search where an empty element is below anything, an error above
+  // anything, numbers below text; an exact hit goes on over equal elements
+  function matBinary(list, v, asc) {
+    const byStr = typeof v === 'string';
+    const empty = (x) => x === null || x === undefined || x === EMPTYR || isMV(x);
+    const cmp = (i) => {
+      let x = list[i];
+      if (empty(x)) return -1;
+      // (an error is a value: below a text query, above a numeric one)
+      if (isErr(x)) return 1;
+      if (typeof x === 'boolean') x = +x;
+      if (typeof x === 'number') {
+        if (byStr) return -1;
+        return x === v ? 0 : x < v ? -1 : 1;
+      }
+      if (!byStr) return 1;
+      const c = strCmp(x, v);
+      return c < 0 ? -1 : c > 0 ? 1 : 0;
+    };
+    const n = list.length;
+    if (!n) return -1;
+    let first = 0, last = n - 1, hit = 0;
+    for (let len = last - first; len > 0; len = last - first) {
+      let mid = first + (len >> 1);
+      const c = cmp(mid);
+      if (c === 0) {
+        const x = list[mid];
+        const same = (y) => (empty(x) ? empty(y) : typeof x === 'string' ? y === x : !isErr(y) && typeof y !== 'string' && !empty(y) && +y === +x);
+        while (mid < n - 1 && same(list[mid + 1])) mid++;
+        return mid;
+      }
+      if (len === 1) { hit = c < 0 ? (asc ? last : first) : (asc ? first : last); break; }
+      if (c < 0) { if (asc) first = mid; else last = mid; } else if (asc) last = mid; else first = mid;
+    }
+    if (hit === n - 1) {
+      const c = cmp(hit);
+      if ((asc && c <= 0) || (!asc && c >= 0)) return hit;
+    }
+    return hit > 0 ? hit - 1 : -1;
+  }
   function lookupPos(list, v, mode, ranges, numsBelowText) {
     if (typeof v === 'boolean') v = v ? 1 : 0;
     // an ascending wildcard search over cells: the first cell the pattern
@@ -2025,6 +2068,7 @@
       return -1;
     }
     if (ranges === 'col' || ranges === 'row') return sortedLookup(list, v, mode > 0, ranges === 'col');
+    if (numsBelowText) return matBinary(list, v, mode > 0);
     if (mode > 0) {
       let best = -1;
       for (let i = 0; i < list.length; i++) {
@@ -2891,12 +2935,17 @@
     if (grids.some((g) => g.length !== R || g[0].length !== C)) return E.VALUE;
     const prods = [];
     for (let c = 0; c < C; c++) for (let r = 0; r < R; r++) {
-      let p = 1;
+      // (Calc multiplies the arrays in turn: a text element makes the
+      // product 0 even beside an error, and of several errors the last wins)
+      let p = 1, err = null, text = false;
       for (const g of grids) {
         const x = g[r][c];
-        if (isErr(x)) return x;
-        p *= typeof x === 'number' ? x : typeof x === 'boolean' ? +x : 0;
+        if (isErr(x)) err = x;
+        else if (typeof x === 'string') text = true;
+        else p *= typeof x === 'number' ? x : typeof x === 'boolean' ? +x : 0;
       }
+      if (text) p = 0;
+      else if (err) return err;
       prods.push(p);
     }
     return kahan(prods);
