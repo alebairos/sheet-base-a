@@ -1709,8 +1709,8 @@
 
   const variance = (n, pop) => {
     const mean = kahan(n) / n.length;
-    let ss = 0; // Calc adds the squared deviations plainly
-    for (const x of n) ss += (x - mean) * (x - mean);
+    let ss = 0; // Calc adds the squared deviations plainly (deviations via approxSub)
+    for (const x of n) { const d = approxSub(x, mean); ss += d * d; } // rtl::math::approxSub
     return ss / (n.length - (pop ? 0 : 1));
   };
   aggregate('VAR', (n, b, parts) => (n.length < 2 ? E.DIV0 : variance(popOrder(parts), false)), { textParam: true });
@@ -2546,6 +2546,8 @@
       // integers below 2^53 are written exactly, other numbers with 15 digits
       if (Number.isInteger(v) && Math.abs(v) < 9007199254740992) return v === 0 ? 0 : v;
       const r = round15(v);
+      // near the largest double the rounded value overflows: keep the number
+      if (!isFinite(r)) return v;
       return r === 0 ? 0 : r;
     }
     return v;

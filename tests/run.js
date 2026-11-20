@@ -31,7 +31,7 @@ for (const f of fs.readdirSync(path.join(dir, 'cases')).sort()) {
     const exp = expected[name];
     if (!exp) { fails.push(`${suite} :: ${name}: no expected value`); fail++; continue; }
     let got;
-    try { got = computeWorkbook(wb); } catch (e) { got = { crash: String(e.stack) }; }
+    try { got = JSON.parse(JSON.stringify(computeWorkbook(wb))); } catch (e) { got = { crash: String(e.stack) }; }
     let ok = true;
     const diffs = [];
     for (const [sn, cells] of Object.entries(exp.sheets)) {
