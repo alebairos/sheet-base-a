@@ -740,35 +740,80 @@
     }
     aev1(node, ctx, sc) {
       const lit = (x) => (x === MISSING ? { t: 'missing' } : { t: 'lit', v: x });
+      // In an ordinary formula (sc) an array made by a function ("jm") reaches
+      // another function's scalar parameter as its first element only, as in
+      // Calc; operators still apply element by element.
+      const one = (m) => (sc && m instanceof Matrix && m.jm ? m.data[0][0] : m);
+      const mark = (m) => { if (sc && m instanceof Matrix && !m.jm) { m = new Matrix(m.data); m.jm = true; } return m; };
+      const jmOf = (r, ms) => { if (sc) r.jm = ms.filter((m) => m instanceof Matrix).every((m) => m.jm); return r; };
       switch (node.t) {
         case 'paren': return this.aev(node.a, ctx, sc);
         case 'neg': case 'pct': {
           const a = this.aev(node.a, ctx, sc);
           if (!(a instanceof Matrix)) return this.ev0(node, ctx);
-          return this.amap([a], (x) => this.ev({ t: node.t, a: lit(x) }, ctx));
+          return jmOf(this.amap([a], (x) => this.ev({ t: node.t, a: lit(x) }, ctx)), [a]);
         }
         case 'bin': {
           const a = this.aev(node.a, ctx, sc), b = this.aev(node.b, ctx, sc);
           if (!(a instanceof Matrix) && !(b instanceof Matrix)) return asComputed(this.binop({ op: node.op, a: lit(a), b: lit(b) }, ctx));
-          return this.amap([a, b], (x, y) => asComputed(this.binop({ op: node.op, a: lit(x), b: lit(y) }, ctx)));
+          const op = node.op;
+          if (op === '^' && !(a instanceof Matrix && b instanceof Matrix)) {
+            // Calc's matrix-scalar power: text and error elements are NaN to
+            // pow(), so x^0 and 1^y are 1 and anything else is #NUM!
+            const pre = [a, b].find((v) => !(v instanceof Matrix) && isErr(v) && !v.fromRef);
+            if (pre) return pre;
+            const num = (v) => {
+              if (v === null || v === undefined || v === EMPTYR || v === MISSING) return 0;
+              const n = this.toNum(v);
+              return isErr(n) ? NaN : n;
+            };
+            return jmOf(this.amap([a, b], (x, y) => {
+              const bx = num(x), by = num(y);
+              if (by === 0 || bx === 1) return 1;
+              if (isNaN(bx) || isNaN(by)) return E.NUM;
+              return asComputed(power(bx, by));
+            }), [a, b]);
+          }
+          const cmpOp = op === '=' || op === '<>' || op === '<' || op === '>' || op === '<=' || op === '>=';
+          return jmOf(this.amap([a, b], (x, y) => asComputed(this.binop({ op, a: lit(x), b: lit(y) }, ctx)), cmpOp), [a, b]);
         }
         case 'fn': {
-          const mp = MAPPED_PARAMS[node.name];
+          const name = node.name;
+          if (name === 'IF' || name === 'IFERROR') {
+            // a scalar condition/value picks a whole branch; an array one picks
+            // element by element (IF without an else branch leaves the element empty)
+            const args = node.args.map((n) => (n.t === 'missing' ? MISSING : this.aev(n, ctx, sc)));
+            if (!(args[0] instanceof Matrix)) return mark(this.ev0(node, ctx));
+            const noElse = name === 'IF' && node.args.length < 3;
+            return mark(this.amap(args, (...xs) => {
+              const r = asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx));
+              return noElse && r === false && !this.toBool(xs[0]) ? null : r;
+            }));
+          }
+          const mp = MAPPED_PARAMS[name];
           if (mp) {
             // a criterion / lookup value / index given as an array: one call per element
-            const args = mp.map((i) => (i < node.args.length && node.args[i].t !== 'missing' ? this.aev(node.args[i], ctx, sc) : null));
-            if (!args.some((m) => m instanceof Matrix)) return this.ev0(node, ctx);
-            return this.amap(args, (...xs) => {
+            const args = mp.map((i) => {
+              if (i >= node.args.length || node.args[i].t === 'missing') return null;
+              const v = this.aev(node.args[i], ctx, sc);
+              return name === 'MATCH' ? v : one(v);
+            });
+            if (!args.some((m) => m instanceof Matrix)) return mark(this.ev0(node, ctx));
+            return mark(this.amap(args, (...xs) => {
               const a2 = node.args.slice();
               mp.forEach((i, k) => { if (args[k] !== null) a2[i] = lit(xs[k]); });
-              const r = this.call({ t: 'fn', name: node.name, args: a2 }, ctx);
+              const r = this.call({ t: 'fn', name, args: a2 }, ctx);
               return asComputed(r instanceof Range ? this.intersect(r, ctx) : r instanceof Matrix ? r.data[0][0] : r);
-            });
+            }));
           }
-          if (!ELEMENTWISE.has(node.name)) return this.ev0(node, ctx);
-          const args = node.args.map((n) => (n.t === 'missing' ? MISSING : this.aev(n, ctx, sc)));
-          if (!args.some((m) => m instanceof Matrix)) return this.ev0(node, ctx);
-          return this.amap(args, (...xs) => asComputed(this.call({ t: 'fn', name: node.name, args: xs.map(lit) }, ctx)));
+          if (!ELEMENTWISE.has(name)) return mark(this.ev0(node, ctx));
+          const args = node.args.map((n) => (n.t === 'missing' ? MISSING : one(this.aev(n, ctx, sc))));
+          if (!args.some((m) => m instanceof Matrix)) return mark(this.ev0(node, ctx));
+          if (name === 'NOT' && args.length === 1) {
+            // Calc's matrix NOT: text that is not a number gives 0
+            return mark(this.amap(args, (x) => (typeof x === 'string' && textToNum(x) === null ? 0 : asComputed(this.call({ t: 'fn', name, args: [lit(x)] }, ctx)))));
+          }
+          return mark(this.amap(args, (...xs) => asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx))));
         }
         default: return this.ev(node, ctx);
       }
@@ -783,21 +828,26 @@
     }
     // element-wise map; a single row/column is repeated, otherwise the
     // result is as large as the smallest operand
-    amap(args, f) {
-      let R = Infinity, C = Infinity;
-      for (const m of args) if (m instanceof Matrix) { if (m.rows > 1) R = Math.min(R, m.rows); if (m.cols > 1) C = Math.min(C, m.cols); }
+    // (comparisons, big: as large as the largest operand, #VALUE! where an
+    // operand has no element)
+    amap(args, f, big) {
+      let R = big ? 1 : Infinity, C = big ? 1 : Infinity;
+      const pick = big ? Math.max : Math.min;
+      for (const m of args) if (m instanceof Matrix) { if (m.rows > 1) R = pick(R, m.rows); if (m.cols > 1) C = pick(C, m.cols); }
       if (R === Infinity) R = 1;
       if (C === Infinity) C = 1;
+      const OUT = {};
       const at = (m, r, c) => {
         if (!(m instanceof Matrix)) return m;
         const rr = m.rows === 1 ? 0 : r, cc = m.cols === 1 ? 0 : c;
-        return rr < m.rows && cc < m.cols ? m.data[rr][cc] : E.NA;
+        return rr < m.rows && cc < m.cols ? m.data[rr][cc] : big ? OUT : E.NA;
       };
       const out = [];
       for (let r = 0; r < R; r++) {
         const row = [];
         for (let c = 0; c < C; c++) {
           const xs = args.map((m) => at(m, r, c));
+          if (big && xs.includes(OUT)) { row.push(E.VALUE); continue; }
           row.push(f(...xs));
         }
         out.push(row);
@@ -1471,7 +1521,7 @@
       const v = this.ev(node, ctx);
       if (v instanceof RefList) v.ranges.forEach((rg) => this.eachCell(rg, () => { n++; }));
       else if (v instanceof Range) this.eachCell(v, () => { n++; });
-      else if (v instanceof Matrix) n += v.rows * v.cols;
+      else if (v instanceof Matrix) { for (const row of v.data) for (const x of row) if (x !== null) n++; }
       else if (v !== null) n++;
     }
     return n;
