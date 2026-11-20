@@ -2872,7 +2872,7 @@
       const r0 = s.wr ? st(s.wr[0], s.wr[2], s.r1, rg.rows) : s.r1, c0 = s.wr ? st(s.wr[1], s.wr[3], s.c1, rg.cols) : s.c1;
       sum = new Range(s.sheet, r0, c0, r0 + rg.rows - 1, c0 + rg.cols - 1);
     }
-    return { rg, match, sum };
+    return { rg, match, sum, crit };
   }
   function condCollect(self, a) {
     const nums = [];
@@ -2922,10 +2922,82 @@
     if (!r.nums.length) return E.DIV0;
     return kahan(r.nums) / r.nums.length;
   });
+  // LibreOffice's allocated columns of each sheet, as far as COUNTIF needs
+  // them (see there): columns with data, those a single-cell reference in
+  // any formula listens to (SUMIF(B1:B5,1,Sheet2!C2) makes column C exist),
+  // and those a query of a formula computed before (in Calc's order: sheet,
+  // column, row) iterated: the ranges SUMIF, AVERAGEIF, the *IFS functions and
+  // MATCH/VLOOKUP/HLOOKUP search, and COUNTIF's when blanks match
+  const ALLOC = new WeakMap();
+  function allocCols(wb) {
+    let m = ALLOC.get(wb);
+    if (m) return m;
+    m = { single: new Map(), queries: new Map() };
+    ALLOC.set(wb, m);
+    const note = (sh, c) => { if (sh && c > (m.single.get(sh) ?? -1)) m.single.set(sh, c); };
+    const sheetsOf = (n, own) => {
+      const k = n.sheet ? n.sheet.indexOf(':') : -1;
+      const n1 = n.t === 'ref3d' ? n.sheet : k > 0 ? n.sheet.slice(0, k) : n.sheet, n2 = n.t === 'ref3d' ? n.sheet2 : k > 0 ? n.sheet.slice(k + 1) : n.sheet2;
+      if (!n2) return [n1 === null || n1 === undefined ? own : wb.sheet(n1)].filter(Boolean);
+      const s1 = wb.sheet(n1), s2 = wb.sheet(n2);
+      if (!s1 || !s2) return [];
+      const i1 = wb.sheets.indexOf(s1), i2 = wb.sheets.indexOf(s2);
+      return wb.sheets.slice(Math.min(i1, i2), Math.max(i1, i2) + 1);
+    };
+    wb.sheets.forEach((sh, si) => { for (const cell of sh.cells.values()) {
+      if (!cell.ast) continue;
+      // (a query creates its range's first column, every column when blanks
+      // match its criterion, as it then visits each cell)
+      const query = (x, all) => {
+        if (!x || x.t !== 'ref' || !x.b) return;
+        const c2 = all ? Math.max(x.a.c, x.b.c) : Math.min(x.a.c, x.b.c);
+        for (const t of sheetsOf(x, sh)) { if (!m.queries.has(t)) m.queries.set(t, []); m.queries.get(t).push({ si, c: cell.c, r: cell.r, c2 }); }
+      };
+      const blanks = (x) => { if (!x || (x.t !== 'str' && x.t !== 'num')) return false; const f = makeCriterion(x.v); return typeof f === 'function' && !!f(null); };
+      const todo = [cell.ast];
+      while (todo.length) {
+        const n = todo.pop();
+        if (!n || typeof n !== 'object') continue;
+        if (Array.isArray(n)) { for (const x of n) todo.push(x); continue; }
+        if ((n.t === 'ref' || n.t === 'ref3d') && !n.b && n.a) { for (const t of sheetsOf(n, sh)) note(t, n.a.c); continue; }
+        if (n.t === 'ref' || n.t === 'ref3d') continue;
+        if (n.t === 'fn' && n.args) {
+          const g = n.args;
+          if (n.name === 'SUMIF' || n.name === 'AVERAGEIF') query(g[0], blanks(g[1]));
+          else if (n.name === 'COUNTIF') { if (blanks(g[1])) query(g[0], true); }
+          else if (n.name === 'COUNTIFS') g.forEach((x, i) => { if (i % 2 === 0) query(x, blanks(g[i + 1])); });
+          else if (n.name === 'SUMIFS' || n.name === 'AVERAGEIFS') g.forEach((x, i) => { if (i % 2 === 1) query(x, blanks(g[i + 1])); });
+          else if (n.name === 'MATCH') { if (g[1] && g[1].t === 'ref' && g[1].b && (g[1].a.r === g[1].b.r || g[1].a.c === g[1].b.c)) query(g[1], false); } // (a 2-D one is #VALUE! first)
+          else if (n.name === 'VLOOKUP' || n.name === 'HLOOKUP') query(g[1], false);
+          // (a SUMIF/AVERAGEIF sum range is resized, not listened to as one cell)
+          if (n.name === 'SUMIF' || n.name === 'AVERAGEIF') { g.forEach((x, i) => { if (i !== 2 || x.t !== 'ref') todo.push(x); }); continue; }
+        }
+        for (const v of Object.values(n)) if (v && typeof v === 'object' && !(n.t === 'rangeop' && v.t === 'ref')) todo.push(v);
+      }
+    } });
+    return m;
+  }
+  function allocatedCol(eng, sh, ctx) {
+    const m = allocCols(eng.wb);
+    let c = Math.max(sh.maxC, m.single.get(sh) ?? -1);
+    const si = eng.wb.sheets.indexOf(ctx.sheet);
+    for (const q of m.queries.get(sh) || []) {
+      if (q.si < si || (q.si === si && (q.c < ctx.c || (q.c === ctx.c && q.r < ctx.r)))) c = Math.max(c, q.c2);
+    }
+    return c;
+  }
   def('COUNTIF', 2, 2, function (nodes, ctx) {
     const a = condArgs(this, nodes, ctx, true); if (isErr(a)) return a;
     let n = 0;
-    const rg = a.rg;
+    let rg = a.rg;
+    // (a pattern of only '*' over columns wholly right of the sheet's last
+    // allocated column counts that column over the range's rows, as
+    // LibreOffice's COUNTIF does)
+    // (its last allocated column, which may be empty: see allocCols)
+    if (rg instanceof Range && typeof a.crit === 'string' && /^=?\*+$/.test(a.crit) && rg.sheet.maxC >= 0) {
+      const lastC = allocatedCol(this, rg.sheet, ctx);
+      if (rg.c1 > lastC) rg = new Range(rg.sheet, rg.r1, lastC, rg.r2, lastC);
+    }
     if (rg instanceof Matrix) {
       for (const row of rg.data) for (const v of row) if (isErr(v) || a.match(v)) n++; // (error elements match any criterion)
       return n;
