@@ -92,12 +92,34 @@
   }
   const addrName = (r, c) => colName(c) + (r + 1);
 
+  // x with 15 significant digits as Calc writes it: the shortest decimal
+  // that round-trips, rounded half up (so 0.19565217391304349, shortest
+  // 0.1956521739130435, becomes 0.195652173913044). Returns toExponential(14) form.
+  function exp15(x) {
+    const [m, ex] = Math.abs(x).toExponential().split('e');
+    let e = parseInt(ex, 10);
+    let d = m.replace('.', '');
+    if (d.length > 15) {
+      const up = d.charCodeAt(15) >= 53; // '5'
+      d = d.slice(0, 15);
+      if (up) {
+        const a = d.split('');
+        let k = 14;
+        while (k >= 0) { if (a[k] === '9') { a[k] = '0'; k--; } else { a[k] = String.fromCharCode(a[k].charCodeAt(0) + 1); break; } }
+        if (k < 0) { a.unshift('1'); a.pop(); e++; }
+        d = a.join('');
+      }
+    } else d = d.padEnd(15, '0');
+    return (x < 0 ? '-' : '') + d[0] + '.' + d.slice(1) + 'e' + (e < 0 ? '-' : '+') + Math.abs(e);
+  }
+  const round15 = (x) => Number(exp15(x));
+
   // General number format as Calc shows it (used for number -> text).
   function fmtNum(x) {
     if (x === 0 || Object.is(x, -0)) return '0';
     if (!isFinite(x)) return '#NUM!';
     if (Number.isInteger(x) && Math.abs(x) < 9007199254740992) return String(x); // exact below 2^53
-    let s = x.toExponential(14); // 15 significant digits
+    let s = exp15(x); // 15 significant digits
     let [mant, exp] = s.split('e');
     let e = parseInt(exp, 10);
     if (e <= -15 || e >= 15) {
@@ -105,7 +127,7 @@
       const sign = e < 0 ? '-' : '+';
       return mant + 'E' + sign + String(Math.abs(e)).padStart(3, '0');
     }
-    const v = Number(x.toPrecision(15));
+    const v = round15(x);
     // fixed notation with up to 15 significant digits
     let out;
     if (e >= 0) out = v.toFixed(Math.max(0, 14 - e));
@@ -1361,20 +1383,19 @@
     const m = s.length >> 1;
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }, { forward: true }, 1);
-  aggregate('STDEV', (n) => {
-    if (n.length < 2) return E.DIV0;
-    const mean = kahan(n) / n.length;
-    const ss = kahan(n.map((x) => (x - mean) * (x - mean)));
-    return Math.sqrt(ss / (n.length - 1));
-  });
+  // variance: values in Calc's order (parameters last to first, cells first to last)
+  const popOrder = (parts) => [].concat(...parts.map((p) => (Array.isArray(p) ? p : [p])));
+  aggregate('STDEV', (n, b, parts) => (n.length < 2 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), false))));
 
   const variance = (n, pop) => {
     const mean = kahan(n) / n.length;
-    return kahan(n.map((x) => (x - mean) * (x - mean))) / (n.length - (pop ? 0 : 1));
+    let ss = 0; // Calc adds the squared deviations plainly
+    for (const x of n) ss += (x - mean) * (x - mean);
+    return ss / (n.length - (pop ? 0 : 1));
   };
-  aggregate('VAR', (n) => (n.length < 2 ? E.DIV0 : variance(n, false)));
-  aggregate('VARP', (n) => (n.length < 1 ? E.DIV0 : variance(n, true)));
-  aggregate('STDEVP', (n) => (n.length < 1 ? E.DIV0 : Math.sqrt(variance(n, true))));
+  aggregate('VAR', (n, b, parts) => (n.length < 2 ? E.DIV0 : variance(popOrder(parts), false)));
+  aggregate('VARP', (n, b, parts) => (n.length < 1 ? E.DIV0 : variance(popOrder(parts), true)));
+  aggregate('STDEVP', (n, b, parts) => (n.length < 1 ? E.DIV0 : Math.sqrt(variance(popOrder(parts), true))));
   const kth = (largest) => function (nodes, ctx) {
     if (nodes.length !== 2) return E.VALUE;
     const r = this.collect([nodes[0]], ctx, {});
@@ -1803,7 +1824,7 @@
     if (typeof x !== 'number' || !isFinite(x)) return fmtNum(x);
     const a = Math.abs(x);
     if (a >= 1e15 && !(a < 1e16 && Number(a.toPrecision(15)) === a)) {
-      const [m, e] = x.toExponential(14).split('e');
+      const [m, e] = exp15(x).split('e');
       const n = parseInt(e, 10);
       return m + 'E' + (n < 0 ? '-' : '+') + String(Math.abs(n)).padStart(2, '0');
     }
@@ -2145,7 +2166,7 @@
       if (!isFinite(v)) return { error: '#NUM!' };
       // integers below 2^53 are written exactly, other numbers with 15 digits
       if (Number.isInteger(v) && Math.abs(v) < 9007199254740992) return v === 0 ? 0 : v;
-      const r = Number(v.toPrecision(15));
+      const r = round15(v);
       return r === 0 ? 0 : r;
     }
     return v;

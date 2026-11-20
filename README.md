@@ -23,7 +23,7 @@ Requires Node.js (>= 18). No dependencies, no build step.
 ## Semantics notes
 
 - Expected values come from LibreOffice recalculating the workbook and writing it out (the oracle in `tools/lo_oracle.py` round-trips through xlsx). In that output Calc's internal errors without an Excel name — `Err:502` (invalid argument, e.g. `SQRT(-1)`, `MID("abc",0,1)`) and `Err:522` (circular reference) — appear as `#VALUE!`, and the engine reports them the same way.
-- Numbers in the output are rounded to 15 significant digits, as Calc stores them in files; integers below 2^53 are written exactly.
+- Numbers in the output are rounded to 15 significant digits as Calc writes them (the shortest round-trip decimal, rounded half up), and integers below 2^53 are written exactly.
 - Arithmetic follows Calc's rounding: `+`/`-` snap results that cancel to within 2^-48 to 0 (but never between exact integers), and SUM/AVERAGE use Calc's Kahan summation (parameters taken last to first, each range column summed on its own, blocks of 8 values in SSE2 lanes, the last term added with the same snapping), so `SUM(0.1,0.2,-0.3)` is 0. Inline and computed arrays are searched with exact number equality, cell ranges with approximate equality.
 - An empty argument (`SUM(1,)`, `LEFT("abc",)`) is 0 as in Calc; references can be intersected (`A1:B3 B2`, a disjoint intersection is `#NULL!`) and joined (`SUM((A1:A2,B1))`); 3D references (`SUM(Sheet1:Sheet3!A1)`, also `'Sheet1:Sheet3'!A1`) cover the sheets between, in workbook order.
 - Text functions count Unicode code points; `CHAR`/`CODE` use UTF-8 like Calc on Linux (`CHAR(233)` is U+FFFD).
@@ -35,5 +35,5 @@ Requires Node.js (>= 18). No dependencies, no build step.
 ## Known deviations
 
 Approximate-match lookups (`VLOOKUP(..., TRUE)`, `HLOOKUP(..., TRUE)`, `MATCH` with type 1 or -1) agree with LibreOffice on sorted data. On unsorted data the engine models Calc's search (a binary search down a column, then a walk while cells satisfy the condition, numbers sorting before text); random unsorted mixed columns agree with LibreOffice about 97% of the time, rows somewhat less.
-SUM over ranges mixing very large and tiny values can still differ from LibreOffice in the last digit (about 1 in 200 such random sums).
+SUM over ranges mixing very large and tiny values can still differ from LibreOffice in the last digit (a few in a thousand such random sums).
 When a single function call meets several different errors at once (for example an error argument and an invalid argument), LibreOffice's choice of which error to report depends on interpreter internals; the engine follows the common cases (first error computed, then arguments examined last to first) but not every combination.
