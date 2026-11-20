@@ -508,10 +508,18 @@
       const rest = src.slice(j);
       if (sheet !== null || /^\$?[A-Za-z]/.test(rest) || /^\$?\d/.test(rest)) {
         let m = refRe.exec(rest);
-        if (m && !/^[\w(]/.test(rest.slice(m[0].length)) && !(sheet === null && /^[.]/.test(rest.slice(m[0].length)))) {
+        if (m && !/^[\w($]/.test(rest.slice(m[0].length)) && !/^[.]/.test(rest.slice(m[0].length))) {
           const a = parseAddr(m[1]);
           const b = m[2] ? parseAddr(m[2]) : null;
           if (a && (!m[2] || b)) {
+            // (xlsx import: a sheet's cell followed by a lone column, Sheet2!A1:B,
+            // is a range along the cell's row)
+            const cm = sheet !== null && !m[2] ? /^:(\$?)([A-Za-z]{1,3})(?![\w.$(!:])/.exec(rest.slice(m[0].length)) : null;
+            if (cm && colIndex(cm[2]) < MAXCOL) {
+              pushTok({ t: 'ref', sheet, sheet2, a, b: { r: a.r, c: colIndex(cm[2]) }, text: src.slice(i, j + m[0].length + cm[0].length) });
+              i = j + m[0].length + cm[0].length;
+              continue;
+            }
             pushTok({ t: 'ref', sheet, sheet2, a, b, text: src.slice(i, j + m[0].length) });
             i = j + m[0].length;
             continue;
@@ -532,7 +540,14 @@
             i = j + m[0].length;
             continue;
           }
-          if (sheet !== null) throw new SyntaxError('bad reference');
+          if (sheet !== null) {
+            // (a sheet name before something that is not a reference: an unknown name)
+            const w = /^[\w.$\u00C0-\uFFFF]*/.exec(rest)[0];
+            if (!w || /^[(]/.test(rest.slice(w.length)) && /^\$?[A-Za-z]{1,3}\$?\d+$/.test(w)) throw new SyntaxError('bad reference');
+            toks.push({ t: 'name', v: src.slice(i, j) + w });
+            i = j + w.length;
+            continue;
+          }
         }
       }
       if (/[0-9.]/.test(ch)) {
@@ -565,8 +580,9 @@
         i += m[0].length;
         continue;
       }
-      if (/[A-Za-z_\u00C0-\uFFFF]/.test(ch)) {
-        const m = /^[A-Za-z_\u00C0-\uFFFF][\w.\u00C0-\uFFFF]*/.exec(src.slice(i));
+      // ('$' is a name character to Calc: a stray one makes an unknown name)
+      if (/[A-Za-z_$\u00C0-\uFFFF]/.test(ch)) {
+        const m = /^[A-Za-z_$\u00C0-\uFFFF][\w.$\u00C0-\uFFFF]*/.exec(src.slice(i));
         toks.push({ t: 'name', v: m[0] });
         i += m[0].length;
         continue;
