@@ -1674,6 +1674,9 @@
           const b = node.b || node.a;
           const rg = new Range(sh, node.a.r, node.a.c, b.r, b.c);
           if (!node.b) rg.single = true; // (Calc's single reference: a scalar in an array context too)
+          // (a range written bottom-up or right-to-left keeps its corners as
+          // written after LibreOffice's xlsx import: intersecting it is empty)
+          if (node.b && (node.a.r > b.r || node.a.c > b.c)) rg.rev = true;
           return rg;
         }
         case 'ref3d': {
@@ -1691,7 +1694,7 @@
           if (isErr(a)) return a;
           if (isErr(b)) return b;
           if (!(a instanceof Range) || !(b instanceof Range)) return E.VALUE;
-          if (a.sheet !== b.sheet) return E.NULL;
+          if (a.sheet !== b.sheet || a.rev || b.rev) return E.NULL;
           const r1 = Math.max(a.r1, b.r1), r2 = Math.min(a.r2, b.r2), c1 = Math.max(a.c1, b.c1), c2 = Math.min(a.c2, b.c2);
           if (r1 > r2 || c1 > c2) return E.NULL;
           return new Range(a.sheet, r1, c1, r2, c2);
