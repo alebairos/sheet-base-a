@@ -856,11 +856,12 @@
     // sheet, intersected with the formula's row or column (also one cell)
     own3d(v, ctx) {
       const own = ctx && v.ranges.find((x) => x.sheet === ctx.sheet);
-      if (!own) return E.VALUE;
+      // (no cell: a conversion error, not a pending one)
+      if (!own) return EREF['#VALUE!'];
       if (own.c1 === own.c2 && ctx.r >= own.r1 && ctx.r <= own.r2) return this.cellValue(own.sheet, ctx.r, own.c1);
       if (own.r1 === own.r2 && ctx.c >= own.c1 && ctx.c <= own.c2) return this.cellValue(own.sheet, own.r1, ctx.c);
       if (ctx.r >= own.r1 && ctx.r <= own.r2 && ctx.c >= own.c1 && ctx.c <= own.c2) return this.cellValue(own.sheet, ctx.r, ctx.c);
-      return E.VALUE;
+      return EREF['#VALUE!'];
     }
 
     sv(node, ctx) { return this.scalar(this.ev(node, ctx), ctx); }
@@ -1522,6 +1523,9 @@
           // SUM's scan
           if (err) return { err: (v.rows === 1 && v.cols === 1) || !opts.colLastErr ? tokOver(k, err) : err };
         } else if (v instanceof Matrix) {
+          // (MIN/MAX: an array holding an error, other than the first
+          // parameter, is passed over whole, as Calc's matrix minimum is NaN)
+          if (opts.arrErrSkip && k > 0 && v.data.some((row) => row.some(isErr))) continue;
           for (const row of v.data) for (const x of row) {
             if (typeof x === 'number') { nums.push(x); } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
             else if (isErr(x) && !opts.skipErrors) return { err: x };
@@ -1897,8 +1901,8 @@
   // AVERAGE adds every value to one Kahan sum (no per-column sums)
   aggregate('AVERAGE', (n, b, parts) => (n.length ? finite(kahan(popOrder(parts)) / n.length) : E.DIV0), { colCont: true });
   const asFmt = (x, b) => (b && (x === 0 || x === 1) ? x === 1 : x);
-  aggregate('MIN', (n, b) => (n.length ? asFmt(Math.min(...n), b) : 0), { textParam: true }, 1);
-  aggregate('MAX', (n, b) => (n.length ? asFmt(Math.max(...n), b) : 0), { textParam: true }, 1);
+  aggregate('MIN', (n, b) => (n.length ? asFmt(Math.min(...n), b) : 0), { textParam: true, arrErrSkip: true }, 1);
+  aggregate('MAX', (n, b) => (n.length ? asFmt(Math.max(...n), b) : 0), { textParam: true, arrErrSkip: true }, 1);
   aggregate('PRODUCT', (n, b, parts) => (n.length ? finite(popOrder(parts).reduce((x, y) => x * y, 1)) : 0), { colCont: true });
   aggregate('COUNT', (n) => n.length, { skipErrors: true, countText: true });
   aggregate('MEDIAN', (n) => {
