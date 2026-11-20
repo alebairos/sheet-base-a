@@ -1439,6 +1439,13 @@
               const b = this.toBool(x);
               return !isErr(b) && (k === 1 ? b : !b);
             }));
+            // (Calc's jump matrix puts its count of run error functions back as
+            // it was before the jump when it is done: an error function in a
+            // branch, or an array IFERROR some element of which takes the
+            // fallback, does not count as run, unless it is the last operation
+            // of the last branch taken; Calc then goes on past later errors,
+            // MOD(SUMPRODUCT(IFERROR(1/{1;0},2))+1/0,"x") is #VALUE!)
+            const efD0 = this.efDone, efS0 = this.efSeen && new Set(this.efSeen);
             const args = [first];
             let skipK = null;
             // (Calc's quirk: a branch that some element takes and that starts
@@ -1515,6 +1522,23 @@
                 b = new Matrix(b.data.slice(0, R).map((row) => row.slice(0, C)));
               }
               args.push(b);
+            }
+            if (efS0) {
+              this.efDone = efD0; this.efSeen = efS0;
+              let lastK = -1;
+              for (let c = 0; c < first.cols; c++) for (let r = 0; r < first.rows; r++) {
+                const x = first.data[r][c];
+                let k = -1;
+                if (name === 'IFERROR') k = isErr(x) ? 1 : -1;
+                else if (!isErr(x) && typeof x !== 'string') {
+                  if (name === 'IF') { const t = this.toBool(x); k = isErr(t) ? -1 : t ? 1 : 2; } else { const n = this.toNum(x); k = isErr(n) ? -1 : Math.trunc(n); }
+                }
+                if (k > 0 && k < node.args.length) lastK = k;
+              }
+              if (name === 'IFERROR' && node.ef) { if (lastK > 0) this.efSeen.add(node); else this.efRan(node); }
+              let bk = lastK > 0 ? node.args[lastK] : null;
+              while (bk && bk.t === 'paren') bk = bk.a;
+              if (bk && bk.t === 'fn' && bk.ef && bk.name !== 'IFERROR') this.efRan(bk);
             }
             const noElse = name === 'IF' && node.args.length < 3;
             const GROWN = {};
@@ -3214,7 +3238,12 @@
     const v = this.ev(nodes[0], ctx);
     if (v instanceof RefList && !v.is3d) return v; // a reference list is not an error: passed on
     const s = this.scalar(v, ctx);
-    if (nodes.ef) this.efRan(nodes.ef); // (Calc runs IFERROR after its value, before the fallback)
+    // (Calc runs IFERROR after its value, before the fallback; an array value
+    // with an error element is a jump matrix that does not count as run)
+    if (nodes.ef) {
+      if (v instanceof Matrix && this.efSeen && v.data.some((row) => row.some(isErr))) this.efSeen.add(nodes.ef);
+      else this.efRan(nodes.ef);
+    }
     if (s === UNKNOWN_FN) return E.NOOP;
     if (isErr(s)) {
       this.boolLost = false;
