@@ -231,6 +231,10 @@
     get rows() { return this.data.length; }
     get cols() { return this.data[0].length; }
   }
+  // a union of references, (A1:A2,B1): only aggregate functions take it
+  class RefList {
+    constructor(ranges) { this.ranges = ranges; }
+  }
   const MISSING = { missing: true };
   // result of calling an unknown function with arguments: #NAME?, but
   // IFERROR/ISERROR turn it into #VALUE! instead of catching it
@@ -249,6 +253,11 @@
     const refRe = /^(\$?[A-Za-z]{1,3}\$?\d+)(?::(\$?[A-Za-z]{1,3}\$?\d+))?/;
     const colRangeRe = /^(\$?[A-Za-z]{1,3}):(\$?[A-Za-z]{1,3})(?![\w(])/;
     const rowRangeRe = /^(\$?\d+):(\$?\d+)(?![\w(.])/;
+    // whitespace between two references is the intersection operator
+    const pushTok = (t) => {
+      if (t.t === 'ref' && i > 0 && /\s/.test(src[i - 1]) && toks.length && toks[toks.length - 1].t === 'ref') toks.push({ t: 'op', v: 'isect' });
+      toks.push(t);
+    };
     while (i < n) {
       const ch = src[i];
       if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') { i++; continue; }
@@ -294,7 +303,7 @@
           const a = parseAddr(m[1]);
           const b = m[2] ? parseAddr(m[2]) : null;
           if (a && (!m[2] || b)) {
-            toks.push({ t: 'ref', sheet, a, b, text: src.slice(i, j + m[0].length) });
+            pushTok({ t: 'ref', sheet, a, b, text: src.slice(i, j + m[0].length) });
             i = j + m[0].length;
             continue;
           }
@@ -302,7 +311,7 @@
         m = colRangeRe.exec(rest);
         if (m) {
           const c1 = colIndex(m[1].replace('$', '')), c2 = colIndex(m[2].replace('$', ''));
-          toks.push({ t: 'ref', sheet, a: { r: 0, c: c1 }, b: { r: MAXROW - 1, c: c2 }, text: src.slice(i, j + m[0].length) });
+          pushTok({ t: 'ref', sheet, a: { r: 0, c: c1 }, b: { r: MAXROW - 1, c: c2 }, text: src.slice(i, j + m[0].length) });
           i = j + m[0].length;
           continue;
         }
@@ -310,7 +319,7 @@
           m = rowRangeRe.exec(rest);
           if (m) {
             const r1 = parseInt(m[1].replace('$', ''), 10) - 1, r2 = parseInt(m[2].replace('$', ''), 10) - 1;
-            toks.push({ t: 'ref', sheet, a: { r: r1, c: 0 }, b: { r: r2, c: MAXCOL - 1 }, text: src.slice(i, j + m[0].length) });
+            pushTok({ t: 'ref', sheet, a: { r: r1, c: 0 }, b: { r: r2, c: MAXCOL - 1 }, text: src.slice(i, j + m[0].length) });
             i = j + m[0].length;
             continue;
           }
@@ -321,7 +330,7 @@
         const rm = rowRangeRe.exec(src.slice(i));
         if (rm) {
           const r1 = parseInt(rm[1].replace('$', ''), 10) - 1, r2 = parseInt(rm[2].replace('$', ''), 10) - 1;
-          toks.push({ t: 'ref', sheet: null, a: { r: r1, c: 0 }, b: { r: r2, c: MAXCOL - 1 }, text: rm[0] });
+          pushTok({ t: 'ref', sheet: null, a: { r: r1, c: 0 }, b: { r: r2, c: MAXCOL - 1 }, text: rm[0] });
           i += rm[0].length;
           continue;
         }
@@ -400,6 +409,11 @@
       return a;
     }
     function rangeop() {
+      let a = rangeop1();
+      while (isOp('isect')) { p++; a = { t: 'isect', a, b: rangeop1() }; }
+      return a;
+    }
+    function rangeop1() {
       let a = primary();
       while (isOp(':')) { p++; a = { t: 'rangeop', a, b: primary() }; }
       return a;
@@ -459,7 +473,17 @@
           return { t: 'name', v: t.v };
         }
         case 'op':
-          if (t.v === '(') { const e = comparison(); expect(')'); return { t: 'paren', a: e }; }
+          if (t.v === '(') {
+            const e = comparison();
+            if (isOp(',')) { // reference union (A1:A2,B1)
+              const items = [e];
+              while (isOp(',')) { p++; items.push(comparison()); }
+              expect(')');
+              return { t: 'union', args: items };
+            }
+            expect(')');
+            return { t: 'paren', a: e };
+          }
           if (t.v === '{') return arrayConst();
           if (t.v === '-') return { t: 'neg', a: unary() };
           if (t.v === '+') return unary();
@@ -556,6 +580,7 @@
     finalValue(v, ctx) {
       if (v instanceof Range) v = this.intersect(v, ctx);
       else if (v instanceof Matrix) v = v.data[0][0];
+      else if (v instanceof RefList) v = E.VALUE;
       if (v === null) return EMPTYR;
       if (v === MISSING) return 0;
       if (typeof v === 'number') {
@@ -588,6 +613,7 @@
     scalar(v, ctx) {
       if (v instanceof Range) return this.intersect(v, ctx);
       if (v instanceof Matrix) return v.data[0][0];
+      if (v instanceof RefList) return E.VALUE;
       return v;
     }
 
@@ -729,6 +755,27 @@
           if (!sh) return E.NAME;
           const b = node.b || node.a;
           return new Range(sh, node.a.r, node.a.c, b.r, b.c);
+        }
+        case 'isect': {
+          const a = this.ev(node.a, ctx), b = this.ev(node.b, ctx);
+          if (isErr(a)) return a;
+          if (isErr(b)) return b;
+          if (!(a instanceof Range) || !(b instanceof Range)) return E.VALUE;
+          if (a.sheet !== b.sheet) return E.NULL;
+          const r1 = Math.max(a.r1, b.r1), r2 = Math.min(a.r2, b.r2), c1 = Math.max(a.c1, b.c1), c2 = Math.min(a.c2, b.c2);
+          if (r1 > r2 || c1 > c2) return E.NULL;
+          return new Range(a.sheet, r1, c1, r2, c2);
+        }
+        case 'union': {
+          const ranges = [];
+          for (const n of node.args) {
+            const v = this.ev(n, ctx);
+            if (isErr(v)) return v;
+            if (v instanceof Range) ranges.push(v);
+            else if (v instanceof RefList) ranges.push(...v.ranges);
+            else return E.VALUE;
+          }
+          return new RefList(ranges);
         }
         case 'rangeop': {
           const a = this.ev(node.a, ctx), b = this.ev(node.b, ctx);
@@ -889,7 +936,7 @@
         if (node.t === 'missing') { vals.push(0); continue; } // an empty argument is 0
         const v = this.ev(node, ctx);
         if (isErr(v) && !v.fromRef && !opts.skipErrors) return { err: v };
-        vals.push(v);
+        if (v instanceof RefList) vals.push(...v.ranges); else vals.push(v);
       }
       // Calc pops parameters from the stack: the last one is examined first
       // (MEDIAN gathers its parameters into an array first: first one first)
@@ -1249,7 +1296,8 @@
     for (const node of nodes) {
       if (node.t === 'missing') { n++; continue; } // an empty argument is 0
       const v = this.ev(node, ctx);
-      if (v instanceof Range) this.eachCell(v, () => { n++; });
+      if (v instanceof RefList) v.ranges.forEach((rg) => this.eachCell(rg, () => { n++; }));
+      else if (v instanceof Range) this.eachCell(v, () => { n++; });
       else if (v instanceof Matrix) n += v.rows * v.cols;
       else if (v !== null) n++;
     }
