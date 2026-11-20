@@ -1071,30 +1071,39 @@
     // does a branch start with a scalar IF (one that jumps) or CHOOSE? (or
     // an IFERROR given an error: then that error)
     jumpFirst(n, ctx) {
-      // (a branch holding an array or a range is computed as an array)
-      const scal = (x) => !hasArr(x) && !hasRange(x);
-      if (!scal(n)) return false;
       for (;;) {
         if (n.t === 'paren' || n.t === 'neg' || n.t === 'pct') n = n.a;
         else if (n.t === 'bin') n = n.a;
         else if (n.t === 'fn' && (n.name === 'IF' || n.name === 'CHOOSE')) {
           if (!n.args.length || n.args[0].t === 'missing') return false;
           const pend = this.pend, gerr = this.gerr;
+          // (a condition that gives an array makes a nested jump matrix, no
+          // quirk: an inline array or a range given directly; ranges inside
+          // operators or functions are intersected or reduced)
+          const c0 = n.args[0].t === 'paren' ? n.args[0].a : n.args[0];
+          if (hasRange(c0) && (c0.t === 'ref' || c0.t === 'ref3d' || c0.t === 'rangeop' || c0.t === 'name')) return false;
+          if (hasArr(n.args[0])) {
+            const c = this.aev(n.args[0], ctx, true);
+            this.pend = pend; this.gerr = gerr;
+            if (c instanceof Matrix) return false;
+          }
           // (an IF without an else branch whose condition is false does not
           // jump; an error the jump gives ends the formula)
           let r = true;
           if (n.name === 'IF' && n.args.length < 3) { const c = this.toBool(this.sv(n.args[0], ctx)); r = !isErr(c) && !!c; }
-          if (r) { const v = this.sv(n, ctx); if (isErr(v)) r = v; }
+          if (r) { const v = this.sv(n, ctx); if (isErr(v)) r = { err: v }; }
           this.pend = pend; this.gerr = gerr;
           return r;
         } else if (n.t === 'fn' && n.name === 'IFERROR') {
           // (an IFERROR whose value is an error: that error ends the formula)
           if (!n.args.length || n.args[0].t === 'missing') return false;
+          // (a range in its value outside any function: no quirk seen)
+          if (n.args[0].t !== 'fn' && hasRange(n.args[0])) return false;
           const pend = this.pend, gerr = this.gerr;
           const v = this.sv(n.args[0], ctx);
           const f = isErr(v) && n.args.length > 1 && n.args[1].t !== 'missing' ? this.sv(n.args[1], ctx) : null;
           this.pend = pend; this.gerr = gerr;
-          return isErr(v) ? (isErr(f) ? f : v) : false;
+          return isErr(v) ? { err: isErr(f) ? f : null, valErr: v } : false;
         } else if (n.t === 'fn' && !ERR_FUNCS.has(n.name) && n.args.length && n.args[0].t !== 'missing') n = n.args[0];
         else return false;
       }
@@ -1212,22 +1221,50 @@
               return !isErr(b) && (k === 1 ? b : !b);
             }));
             const args = [first];
+            let skipK = null;
             // (Calc's quirk: a branch that some element takes and that starts
             // with a scalar IF or CHOOSE ends the whole formula: #VALUE!, or
             // #N/A when a value was already on the stack)
             // (not while Calc goes on past an earlier error)
             if (sc && !this.fa && !(this.gerr && this.gerr.clr === this.clr)) {
-              // (#VALUE! when the last element takes such a branch)
-              const x0 = first.data[first.rows - 1][first.cols - 1];
-              let k0 = -1; // (an error element takes no branch)
-              if (name === 'IFERROR') k0 = 1; // (its value is no branch)
-              else if (!isErr(x0) && typeof x0 !== 'string') {
-                if (name === 'IF') { const b = this.toBool(x0); k0 = isErr(b) ? 0 : b ? 1 : 2; } else { const n = this.toNum(x0); k0 = isErr(n) ? 0 : Math.trunc(n); }
+              // the branch each element takes, column by column (an array
+              // IFERROR jumps only for its error elements; an error or text
+              // element of a condition takes no branch)
+              const seq = [];
+              for (let c = 0; c < first.cols; c++) for (let r = 0; r < first.rows; r++) {
+                const x = first.data[r][c];
+                if (name === 'IFERROR') { if (isErr(x)) seq.push(1); continue; }
+                if (isErr(x) || typeof x === 'string') { seq.push(-1); continue; }
+                if (name === 'IF') { const t = this.toBool(x); seq.push(isErr(t) ? -1 : t ? 1 : 2); } else { const n = this.toNum(x); seq.push(isErr(n) ? -1 : Math.trunc(n)); }
               }
+              const kLast = seq.length ? seq[seq.length - 1] : -1, kFirst = seq.length ? seq[0] : -1;
+              const deep = stackDepth(this.root, node) > 0;
+              skipK = new Set();
               for (let k = 1; k < node.args.length; k++) {
                 const j = used(k) && this.jumpFirst(node.args[k], ctx);
-                if (isErr(j)) throw new JumpAbort(asComputed(j));
-                if (j) throw new JumpAbort(stackDepth(this.root, node) > 0 || (k0 >= 0 && k !== k0) ? E.NA : E.VALUE);
+                if (!j) continue;
+                const err = j === true ? null : j.err;
+                // (an IFERROR given a computed error, taken by two elements in a row:
+                // its value's error; a cell's error does not)
+                if (j.valErr && !(j.valErr.fromRef && !j.valErr.tok) && seq.some((b, i) => i > 0 && b === k && seq[i - 1] === k)) throw new JumpAbort(asComputed(j.valErr));
+                if (!deep) {
+                  // (the last element takes the branch, or is an error and takes
+                  // none: the jump's error, else #VALUE!)
+                  if (kLast === k || kLast < 0) throw new JumpAbort(err ? asComputed(err) : E.VALUE);
+                  // (the first does: #N/A)
+                  if (kFirst === k) throw new JumpAbort(E.NA);
+                } else {
+                  // (with a value on the stack: the jump's error if the last
+                  // element takes the branch; else #VALUE! when an odd number
+                  // of elements take it, #N/A when an even number do and the
+                  // first is one of them)
+                  if (err && kLast === k) throw new JumpAbort(asComputed(err));
+                  if (seq.filter((b) => b === k).length % 2) throw new JumpAbort(E.VALUE);
+                  if (kFirst === k) throw new JumpAbort(E.NA);
+                }
+                // (else the elements that take it are left as Calc's result
+                // matrix starts: #N/A)
+                skipK.add(k);
               }
             }
             let anyBool = false;
@@ -1235,6 +1272,7 @@
               const before = this.pend, gBefore = this.gerr;
               // with an array condition a range branch is taken as an array
               this.lastChildErr = false;
+              if (skipK && skipK.has(k)) { args.push(E.NA); continue; }
               let b = node.args[k].t === 'missing' ? MISSING : this.aev1(node.args[k], ctx, sc);
               // (a computed boolean in a branch some element takes gives the
               // whole result the boolean format; a cell's boolean does not)
