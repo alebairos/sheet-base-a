@@ -757,6 +757,11 @@
       if (rg.rows === 1 && ctx && ctx.sheet !== rg.sheet && ctx.c >= rg.c1 && ctx.c <= rg.c2) {
         return asRefErr(this.cellValue(rg.sheet, rg.r1, ctx.c));
       }
+      // a block: the cell in the formula's row and column, when both are inside
+      if (ctx && ctx.r >= rg.r1 && ctx.r <= rg.r2 && ctx.c >= rg.c1 && ctx.c <= rg.c2) {
+        if (ctx.sheet === rg.sheet) return EREF['Err:522']; // the formula cell itself
+        return asRefErr(this.cellValue(rg.sheet, ctx.r, ctx.c));
+      }
       return EREF['#VALUE!'];
     }
 
