@@ -1132,11 +1132,14 @@
       const pos = (i) => (byRow ? [v.r1, v.c1 + i] : [v.r1 + i, v.c1]);
       const cellAt = (i) => { const [r, c] = pos(i); return v.sheet.cells.get(r * MAXCOL + c); };
       const get = (i) => { const [r, c] = pos(i); const x = this.cellValue(v.sheet, r, c); return x === EMPTYR ? 0 : x; };
+      // (a formula cell: Calc's sorted search skips only constant text at the start)
+      const formulaAt = (i) => { const cell = cellAt(i); return !!cell && !!(cell.ast || cell.parseError); };
       let final = true;
       for (let i = 0; i < n && final; i++) { const cell = cellAt(i); if (cell && cell.state !== 2 && cell.ast) final = false; }
       if (final) {
         const out = [];
         for (let i = 0; i < n; i++) out.push(get(i));
+        out.formulaAt = formulaAt;
         this.lineCache.set(key, out);
         return out;
       }
@@ -1150,6 +1153,7 @@
       return new Proxy(vals, {
         get(t, k) {
           if (k === 'blankAt') return blankAt;
+          if (k === 'formulaAt') return formulaAt;
           if (typeof k === 'string' && /^\d+$/.test(k)) return +k < n ? at(+k) : undefined;
           return Reflect.get(t, k);
         },
@@ -2426,7 +2430,10 @@
       if ((asc && t > 0) || (!asc && t < 0)) { row++; skipped = true; }
     }
     while (row < n && isNull(row)) row++;
-    if (allStringIgnore) while (row < n && (list[row] === null || isStr(list[row]))) row++;
+    // (leading text cells are passed over for a numeric query; text a formula
+    // gives is not, as Calc tells them by cell type)
+    const fAt = (i) => !!list0.formulaAt && list0.formulaAt(i);
+    if (allStringIgnore) while (row < n && (list[row] === null || (isStr(list[row]) && !fAt(row)))) row++;
     let start = row;
     if (binary && row < n) {
       const idx = [];
