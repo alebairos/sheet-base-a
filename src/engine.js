@@ -2234,6 +2234,7 @@
     const rest = this.args(nodes.slice(2), ctx, ['n'], [1]);
     if (isErr(v) && !v.fromRef) return v.code === '#N/A' ? E.LOOKNA : v;
     if (isErr(rg)) return rg;
+    if (rg === MISSING) return E.VALUE;
     if (isErr(rest)) return rest;
     if (isErr(v)) return v;
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.NA;
