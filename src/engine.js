@@ -481,6 +481,8 @@
     while (i < n) {
       const ch = src[i];
       if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') { i++; continue; }
+      // (an inline array opened inside another fails the whole formula: #N/A)
+      if (ch === '{' && toks.some((t) => t.t === 'op' && t.v === '{') && toks.filter((t) => t.t === 'op' && t.v === '{').length > toks.filter((t) => t.t === 'op' && t.v === '}').length) fail0('nested array', '#N/A');
       if (ch === '"') {
         let s = '';
         i++;
@@ -615,6 +617,14 @@
           const w = /^[\w.\p{L}\p{N}\p{M}\u00B7]*/u.exec(after)[0];
           const next = after.slice(w.length);
           if (/^[eE]$/.test(w) && next !== '' && !/^[+-]/.test(next)) fail0('bad exponent', 'Err:509');
+          toks.push({ t: 'name', v: m[0] + w });
+          i += m[0].length + w.length;
+          continue;
+        }
+        // (an unsigned exponent running into '.', or any exponent into another
+        // signed exponent, is a name too: 1E3.5, 1.5e-1E-3; 1e-0.5 is a syntax error)
+        if (m[2] && ((/^\.[\d.]/.test(after) && !/[+-]/.test(m[2])) || /^[eE][+-]\d/.test(after))) {
+          const w = /^(?:[eE][+-])?[\w.]*/.exec(after)[0];
           toks.push({ t: 'name', v: m[0] + w });
           i += m[0].length + w.length;
           continue;
@@ -855,6 +865,7 @@
         // Calc's compiler skips further leading '=' signs (and spaces between them): '==1' is 1
         try { cell.ast = parse(raw.slice(1).replace(/^[\s=]*=/, '')); } catch (e) { cell.parseError = e.code || '#VALUE!'; }
         if (cell.ast && raw.length > 196) { const e = compileLimits(raw.slice(1), cell.ast); if (e) { cell.ast = null; cell.parseError = e; } }
+        if (cell.ast) { const e = compileArity(cell.ast); if (e) { cell.ast = null; cell.parseError = e; } }
       } else if (raw !== null && typeof raw === 'object') {
         cell.value = raw.error ? errByCode(raw.error) : null;
         cell.state = 2;
@@ -1117,7 +1128,10 @@
     // whose inline arrays still compute element by element)
     // (a single cell reference is a scalar even in an array context, as
     // Calc's single reference: SUMPRODUCT(B4^2) with text in B4 is #VALUE!)
-    aev(node, ctx, sc) { return this.aevPost(this.aev1(node, ctx, sc), ctx, sc || (node.t === 'ref' && !node.b)); }
+    aev(node, ctx, sc) {
+      let u = node; while (u.t === 'paren') u = u.a; // ((B7) is the same single reference)
+      return this.aevPost(this.aev1(node, ctx, sc), ctx, sc || (u.t === 'ref' && !u.b));
+    }
     // an error function of the formula has run (counted once: see countErrFuncs)
     // an error met while the formula still has an error function to run:
     // Calc's interpreter goes on with it set (see ev0); null otherwise
@@ -1183,6 +1197,8 @@
       }
     }
     // a computed error stays pending, or is a token if Calc goes on past it (contErr)
+    // (the table's own error is never computed then: MATCH(1/0,NA()) is #DIV/0!)
+    lookPend(v, pend0) { if (isErr(v) && !v.fromRef && !v.tok && !v.lit) this.pend = pend0; }
     notePend(v) {
       if (this.inElem && this.fa) return v; // (an element's error, in a force-array context)
       if (isErr(v) && !v.fromRef && !v.tok) { const t = this.contErr(v); if (t) return t; }
@@ -1214,7 +1230,8 @@
         case 'paren': {
           // (brackets do not consume an error: no pending error of their own)
           let v = this.aev1(node.a, ctx, sc);
-          if (v instanceof Range) v = sc ? this.intersect(v, ctx) : this.rangeMatrix(v);
+          let u = node.a; while (u.t === 'paren') u = u.a; // (a single cell reference stays a scalar)
+          if (v instanceof Range) v = sc || (u.t === 'ref' && !u.b) ? this.intersect(v, ctx) : this.rangeMatrix(v);
           return v;
         }
         case 'neg': case 'pct': {
@@ -1234,6 +1251,12 @@
             a = fix(ra); b = fix(rb);
           } else { a = this.aev(node.a, ctx, sc); b = this.aev(node.b, ctx, sc); }
           if (!(a instanceof Matrix) && !(b instanceof Matrix)) return asComputed(this.binop({ op: node.op, a: lit(a), b: lit(b) }, ctx));
+          // (text minus an array: Calc computes text's value minus each element,
+          // so the text's conversion error wins over error elements: ""-{1,2}/0)
+          if (node.op === '-' && typeof a === 'string' && b instanceof Matrix) {
+            const x = this.toNum(a);
+            if (isErr(x)) return jmOf(this.amap([b], () => x), [b]);
+          }
           const op = node.op;
           if (op === '^' && !(a instanceof Matrix && b instanceof Matrix)) {
             // Calc's matrix-scalar power: text and error elements are NaN to
@@ -3336,7 +3359,9 @@
   def('HLOOKUP', 3, 4, function (nodes, ctx) {
     let v = this.sv(nodes[0], ctx);
     const clr0 = this.clr;
+    const pend0 = this.pend;
     const tbl = this.fev(nodes[1], ctx);
+    this.lookPend(v, pend0);
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
     if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
     if (isErr(v) && !v.fromRef) return lookErr(v);
@@ -3369,7 +3394,9 @@
   def('VLOOKUP', 3, 4, function (nodes, ctx) {
     let v = this.sv(nodes[0], ctx);
     const clr0 = this.clr;
+    const pend0 = this.pend;
     const tbl = this.fev(nodes[1], ctx);
+    this.lookPend(v, pend0);
     const rest = this.args(nodes.slice(2), ctx, ['n', 'b'], [undefined, true]);
     if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
     if (isErr(v) && !v.fromRef) return lookErr(v);
@@ -3395,7 +3422,9 @@
     let v = this.sv(nodes[0], ctx);
     if (v === MISSING) v = 0;
     const clr0 = this.clr;
+    const pend0 = this.pend;
     const rg = this.fev(nodes[1], ctx);
+    this.lookPend(v, pend0);
     const rest = this.args(nodes.slice(2), ctx, ['n'], [1]);
     if (this.clr !== clr0) v = demote(v); // a later argument cleared the pending error
     if (isErr(v) && !v.fromRef) return lookErr(v);
@@ -3623,6 +3652,29 @@
   // Calc's compiler limits: parentheses nest at most 98 deep (Err:514), a
   // formula holds at most 8191 tokens and a
   // function at most 255 parameters (Err:512); both show as #N/A.
+  // Argument counts Calc's compiler rejects, even in a branch never taken:
+  // more than one for a function of at most one parameter, none for a
+  // function that needs some, and a wrong count for IF and IFERROR.
+  const RUNTIME_COUNT = new Set(['COUNTBLANK', 'ROWS', 'COLUMNS', 'TRANSPOSE']);
+  function compileArity(ast) {
+    const todo = [ast];
+    while (todo.length) {
+      const node = todo.pop();
+      if (!node || typeof node !== 'object') continue;
+      if (node.t === 'fn' && FUNCS[node.name]) {
+        const f = FUNCS[node.name], n = node.args.length, cond = node.name === 'IF' || node.name === 'IFERROR' || (node.name === 'CHOOSE' && !n);
+        // (Calc's fixed one- and no-parameter functions; not the reference
+        // and matrix ones, which check their count when they run)
+        const fixed = f.max === f.min && f.max <= 1 && !RUNTIME_COUNT.has(node.name);
+        if (n < f.min && ((!n && fixed) || cond)) return E.NOARG.code;
+        if (n > f.max && (fixed || cond)) return fixed ? E.PAREN.code : E.PARAM.code;
+      }
+      if (node.args) todo.push(...node.args);
+      if (node.a && node.a.t) todo.push(node.a);
+      if (node.b && node.b.t) todo.push(node.b);
+    }
+    return null;
+  }
   function compileLimits(src, ast) {
     let d = 0, max = 0, n = 0;
     for (const t of tokenize(src)) {
