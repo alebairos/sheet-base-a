@@ -1230,11 +1230,16 @@
                 if (j) throw new JumpAbort(stackDepth(this.root, node) > 0 || (k0 >= 0 && k !== k0) ? E.NA : E.VALUE);
               }
             }
+            let anyBool = false;
             for (let k = 1; k < node.args.length; k++) {
               const before = this.pend, gBefore = this.gerr;
               // with an array condition a range branch is taken as an array
               this.lastChildErr = false;
               let b = node.args[k].t === 'missing' ? MISSING : this.aev1(node.args[k], ctx, sc);
+              // (a computed boolean in a branch some element takes gives the
+              // whole result the boolean format; a cell's boolean does not)
+              if (name !== 'IFERROR' && used(k) && node.args[k].t !== 'ref' && !(b instanceof Range) &&
+                  (typeof b === 'boolean' || (b instanceof Matrix && (b.boolRes || b.data.some((row) => row.some((x) => typeof x === 'boolean')))))) anyBool = true;
               if (b instanceof Range) b = this.rangeMatrix(b);
               // a branch's error is only the element's, unless a computed
               // error went through a further operation in the branch
@@ -1253,7 +1258,7 @@
             const noElse = name === 'IF' && node.args.length < 3;
             // as large as the largest argument; a position the chosen branch
             // lacks is #N/A
-            return mark(epath(this.amap(args, (...xs) => {
+            const res = mark(epath(this.amap(args, (...xs) => {
               if (xs[0] === AMISS) return E.NA;
               // a text element of an array condition is an error (even numeric text)
               if (name !== 'IFERROR' && typeof xs[0] === 'string') return E.VALUE;
@@ -1265,9 +1270,13 @@
               } else pick = isErr(xs[0]) ? 1 : 0;
               if (pick && xs[pick] === AMISS) return E.NA;
               xs = xs.map((x) => (x === AMISS ? null : x));
-              const r = asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx));
+              let r = asComputed(this.call({ t: 'fn', name, args: xs.map(lit) }, ctx));
+              // (IFERROR's array loses the boolean format)
+              if (name === 'IFERROR' && typeof r === 'boolean') r = +r;
               return noElse && r === false && !this.toBool(xs[0]) ? EPATH : r;
             }, true, true)));
+            if (anyBool && res instanceof Matrix) res.boolRes = true;
+            return res;
           }
           const mp = MAPPED_PARAMS[name];
           if (mp) {
