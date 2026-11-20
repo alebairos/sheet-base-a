@@ -1,9 +1,10 @@
 #!/bin/sh
 # Whole test suite: engine fixtures (expected values computed by LibreOffice),
-# CLI contract, CSV import/export, and a UI smoke test (skipped without Chromium).
+# CLI contract, CSV import/export, result shapes, and a UI smoke test (skipped without Chromium).
 set -e
 cd "$(dirname "$0")/.."
 node tests/run.js
 node tests/cli.js
 node tests/csv.js
+node tests/shape.js
 sh tests/ui_smoke.sh
