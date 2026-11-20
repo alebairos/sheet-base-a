@@ -361,6 +361,11 @@
   // value of a formula whose result is an empty cell (e.g. =B1 with B1 empty):
   // shown as 0, but compares like an empty cell and is neither number nor text
   const EMPTYR = { emptyResult: true };
+  // a blank (LBLANK) or empty-result (LEMPTY) cell returned by VLOOKUP/HLOOKUP:
+  // 0 as a number, "" as text, counted by COUNT/COUNTA; only the blank one
+  // is ISBLANK
+  const LBLANK = { lookupBlank: true }, LEMPTY = { lookupEmpty: true };
+  const isLB = (v) => v === LBLANK || v === LEMPTY;
 
   // ---------------------------------------------------------------- tokenizer
   const ERRLITS = ['#DIV/0!', '#VALUE!', '#REF!', '#NAME?', '#N/A', '#NUM!', '#NULL!'];
@@ -728,7 +733,7 @@
       else if (v instanceof Matrix) v = v.data[0][0];
       else if (v instanceof RefList) v = E.VALUE;
       if (v === null) return EMPTYR;
-      if (v === MISSING) return 0;
+      if (v === MISSING || isLB(v)) return 0;
       if (typeof v === 'number') {
         if (!isFinite(v)) return E.NUM;
         return v;
@@ -1158,7 +1163,7 @@
     toNum(v) {
       if (typeof v === 'number') return v;
       if (typeof v === 'boolean') return v ? 1 : 0;
-      if (v === null || v === MISSING || v === EMPTYR) return 0;
+      if (v === null || v === MISSING || v === EMPTYR || isLB(v)) return 0;
       if (isErr(v)) return v;
       if (typeof v === 'string') {
         const n = textToNum(v);
@@ -1170,7 +1175,7 @@
       if (typeof v === 'string') return v;
       if (typeof v === 'number') return fmtNum(v);
       if (typeof v === 'boolean') return v ? '1' : '0';
-      if (v === null || v === MISSING) return '';
+      if (v === null || v === MISSING || isLB(v)) return '';
       if (v === EMPTYR) return '0';
       if (isErr(v)) return v;
       return E.VALUE;
@@ -1178,7 +1183,7 @@
     toBool(v) {
       if (typeof v === 'boolean') return v;
       if (typeof v === 'number') return v !== 0;
-      if (v === null || v === MISSING || v === EMPTYR) return false;
+      if (v === null || v === MISSING || v === EMPTYR || isLB(v)) return false;
       if (isErr(v)) return v;
       if (typeof v === 'string') {
         const n = textToNum(v);
@@ -1340,7 +1345,7 @@
             if (typeof x === 'number') { nums.push(x); } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
             else if (isErr(x) && !opts.skipErrors) return { err: x };
           }
-        } else if (typeof v === 'number') { nums.push(v); } else if (typeof v === 'boolean') { nums.push(v ? 1 : 0); } else if (v === EMPTYR) { nums.push(0); } else if (isErr(v)) { if (!opts.skipErrors) return { err: v }; } else if (typeof v === 'string') {
+        } else if (typeof v === 'number') { nums.push(v); } else if (typeof v === 'boolean') { nums.push(v ? 1 : 0); } else if (v === EMPTYR || isLB(v)) { nums.push(0); } else if (isErr(v)) { if (!opts.skipErrors) return { err: v }; } else if (typeof v === 'string') {
           const n = textToNum(v);
           if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: tokBefore(opts.forward || opts.noTok ? [] : vals, k, opts.textParam ? E.PARAM : E.VALUE) };
         }
@@ -1399,8 +1404,8 @@
 
   // compare two non-error scalars as Calc's comparison operators do
   function compare(a, b) {
-    if (a === EMPTYR) a = null;
-    if (b === EMPTYR) b = null;
+    if (a === EMPTYR || isLB(a)) a = null;
+    if (b === EMPTYR || isLB(b)) b = null;
     if (a === null || a === MISSING) a = typeof b === 'string' ? '' : 0;
     if (b === null || b === MISSING) b = typeof a === 'string' ? '' : 0;
     if (typeof a === 'boolean') a = a ? 1 : 0;
@@ -1895,7 +1900,7 @@
     if (isErr(rg)) return rg;
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.PARAM;
     let crit = self.sv(nodes[1], ctx);
-    if (crit === MISSING) crit = null;
+    if (crit === MISSING || isLB(crit)) crit = null;
     const match = makeCriterion(crit);
     if (isErr(match)) return match;
     let sum = rg;
@@ -2022,7 +2027,7 @@
             if (typeof x === 'number' || typeof x === 'boolean') { acc = combine(acc, !!+x); any = true; } else if (typeof x === 'string') return E.IARG;
           }
         } else if (isErr(v)) return v;
-        else if (typeof v === 'number' || typeof v === 'boolean') { acc = combine(acc, !!+v); any = true; } else if (v === EMPTYR) { acc = combine(acc, false); any = true; } else if (typeof v === 'string') return E.VALUE;
+        else if (typeof v === 'number' || typeof v === 'boolean') { acc = combine(acc, !!+v); any = true; } else if (v === EMPTYR || isLB(v)) { acc = combine(acc, false); any = true; } else if (typeof v === 'string') return E.VALUE;
       }
       return any ? acc : E.VALUE;
     });
@@ -2045,7 +2050,7 @@
     this.eachCell(rg, (v) => { if (v !== '') nonBlank++; });
     return rg.rows * rg.cols - nonBlank;
   });
-  def('ISBLANK', 1, 1, function (nodes, ctx) { return this.sv(nodes[0], ctx) === null; });
+  def('ISBLANK', 1, 1, function (nodes, ctx) { const v = this.sv(nodes[0], ctx); return v === null || v === LBLANK; });
   def('ISNUMBER', 1, 1, function (nodes, ctx) {
     const v = this.sv(nodes[0], ctx);
     return typeof v === 'number' || typeof v === 'boolean';
@@ -2423,7 +2428,7 @@
       if (isErr(rg)) return rg;
       if (!(rg instanceof Range)) return E.VALUE;
       let crit = self.sv(nodes[i + 1], ctx);
-      if (crit === MISSING) crit = null;
+      if (crit === MISSING || isLB(crit)) crit = null;
       const m = makeCriterion(crit);
       if (isErr(m)) return m;
       pairs.push([rg, m]);
@@ -2482,13 +2487,13 @@
     if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
     if (row < 1 || row > tbl.rows) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
-    if (v === null) return E.NA;
+    if (v === null) v = ''; else if (isLB(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const i = lookupPos(this.firstLine(tbl, true), v, sorted ? 1 : 0, tbl instanceof Range ? 'row' : null);
     if (i < 0) return E.NA;
     let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + row - 1, tbl.c1 + i) : tbl.data[row - 1][i];
-    if (out === EMPTYR) out = 0;
+    if (out === EMPTYR) return LEMPTY;
     if (typeof out === 'boolean') return out ? 1 : 0;
-    return out === null ? 0 : out;
+    return out === null ? LBLANK : out;
   });
 
   // ---- lookup
@@ -2506,14 +2511,14 @@
     if (!(tbl instanceof Range) && !(tbl instanceof Matrix)) return isErr(v) ? v : E.VALUE;
     if (col < 1 || col > tbl.cols) return E.IARG;
     if (isErr(v)) return v; // an error read from a cell, after the index check
-    if (v === null) return E.NA;
+    if (v === null) v = ''; else if (isLB(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const first = this.firstLine(tbl, false);
     const i = lookupPos(first, v, sorted ? 1 : 0, tbl instanceof Range ? 'col' : null);
     if (i < 0) return E.NA;
     let out = tbl instanceof Range ? this.cellValue(tbl.sheet, tbl.r1 + i, tbl.c1 + col - 1) : tbl.data[i][col - 1];
-    if (out === EMPTYR) out = 0;
+    if (out === EMPTYR) return LEMPTY;
     if (typeof out === 'boolean') return out ? 1 : 0;
-    return out === null ? 0 : out;
+    return out === null ? LBLANK : out;
   });
   def('MATCH', 2, 3, function (nodes, ctx) {
     let v = this.sv(nodes[0], ctx);
@@ -2530,9 +2535,10 @@
     const mode = Math.trunc(rest[0]);
     if (mode < -1 || mode > 1) return E.PARAM;
     if (isErr(v)) return v;
+    if (rg instanceof RefList) return E.VALUE;
     if (!(rg instanceof Range) && !(rg instanceof Matrix)) return E.NA;
     if (rg.rows !== 1 && rg.cols !== 1) return E.PARAM;
-    if (v === null) return E.NA;
+    if (v === null) v = ''; else if (isLB(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const list = this.firstLine(rg, rg.cols !== 1);
     const i = lookupPos(list, v, mode, rg instanceof Range ? (rg.cols === 1 ? 'col' : 'row') : null, true);
     return i < 0 ? E.NA : i + 1;
@@ -2574,7 +2580,7 @@
 
   // ---------------------------------------------------------------- public API
   function outValue(v) {
-    if (v === EMPTYR || v === null) return 0;
+    if (v === EMPTYR || v === null || isLB(v)) return 0;
     if (isErr(v)) return { error: errText(v.code) };
     if (typeof v === 'number') {
       if (!isFinite(v)) return { error: '#NUM!' };
