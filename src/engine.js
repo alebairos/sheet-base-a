@@ -3186,6 +3186,11 @@
     if (isErr(v)) return v; // an error read from a cell, after the index check
     if (v === null) v = ''; else if (isLB(v) || v === EMPTYR || isMV(v)) v = 0; // a blank lookup value looks for empty text (a formula's "")
     const list = this.firstLine(tbl, true);
+    // (an exact HLOOKUP of a number along an array stops at an error element)
+    if (!sorted && tbl instanceof Matrix && (typeof v === 'number' || typeof v === 'boolean')) {
+      const k = list.findIndex((x) => isErr(x) || lookupEq(v, x, true));
+      if (k >= 0 && isErr(list[k])) return list[k];
+    }
     const i = sorted && tbl instanceof Matrix ? arrLookup(list, v) : lookupPos(list, v, sorted ? 1 : 0, tbl instanceof Range ? 'row' : null);
     if (isErr(i)) return i;
     if (i < 0) return E.NA;
