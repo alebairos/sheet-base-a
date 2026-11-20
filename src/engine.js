@@ -34,7 +34,15 @@
   const asRefErr = (v) => (isErr(v) && !v.fromRef ? (EREF[v.code] || new FErr(v.code, true)) : v);
   // an error whose pending state was cleared (IFERROR, ISNUMBER, ... ran
   // later) is an ordinary operand; Calc's internal lookup error then reads as #VALUE!
-  const demote = (v) => (v === E.LOOKNA ? EREF['#VALUE!'] : asRefErr(v));
+  // (an error token on Calc's stack: popped as an operand it replaces the
+  // error a conversion of the other operand set)
+  const ETOK = {};
+  const demote = (v) => {
+    if (!isErr(v) || v.fromRef) return v;
+    const code = v === E.LOOKNA ? '#VALUE!' : v.code;
+    if (!ETOK[code]) { ETOK[code] = new FErr(code, true); ETOK[code].tok = true; }
+    return ETOK[code];
+  };
   const asComputed = (v) => (isErr(v) && v.fromRef ? errByCode(v.code) : v);
 
   // ---------------------------------------------------------------- helpers
@@ -1206,7 +1214,8 @@
           default: return c >= 0;
         }
       }
-      const y = this.toNum(b); if (isErr(y)) return y;
+      const y = this.toNum(b);
+      if (isErr(y)) return isErr(a) && a.tok ? a : y;
       const x = this.toNum(a); if (isErr(x)) return x;
       return arith(op, x, y);
     }
