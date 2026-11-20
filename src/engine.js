@@ -2394,10 +2394,17 @@
     // matches (and the matching cells right after it); without one, a sorted
     // search comparing the pattern as plain text
     if (mode !== 0 && typeof v === 'string' && hasWild(v) && (ranges === 'col' || ranges === 'row')) {
-      let i = list.findIndex((x) => lookupEq(v, x, false));
+      // (numbers and booleans before the first text or error cell are passed
+      // over; an error cell matches as its code's text, except as the first
+      // cell, and an ascending search starts on one only after a number)
+      const t0 = list.findIndex((x) => typeof x === 'string' || x === EMPTYR || isErr(x));
+      const re = wildcardRe(v);
+      const wm = (x, k) => (isErr(x) ? k > 0 && re.test(x.code) : lookupEq(v, x, false));
+      const prevNum = (k) => { while (--k >= 0) { const y = list[k]; if (y !== null && y !== undefined) return typeof y === 'number' || typeof y === 'boolean'; } return false; };
+      let i = t0 < 0 ? -1 : list.findIndex((x, k) => k >= t0 && wm(x, k) && (!isErr(x) || mode < 0 || prevNum(k)));
       if (i < 0) return mode > 0 ? sortedLookup(list, v, true, ranges === 'col') : wildDescWalk(list, v);
       // (the run of matching cells goes on over blank cells)
-      for (let j = i + 1; j < list.length; j++) { const x = list[j]; if (x === null || x === undefined) continue; if (lookupEq(v, x, false)) i = j; else break; }
+      for (let j = i + 1; j < list.length; j++) { const x = list[j]; if (x === null || x === undefined) continue; if (wm(x, j)) i = j; else break; }
       return i;
     }
     // (inline arrays compare a pattern as plain text in a sorted search)
