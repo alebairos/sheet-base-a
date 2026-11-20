@@ -1,0 +1,213 @@
+{
+ "if_untaken": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=IF(FALSE,A1,1)",
+    "B1": "=A1+1"
+   }
+  }
+ },
+ "if_taken": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=IF(TRUE,A1,1)",
+    "B1": "=A1+1"
+   }
+  }
+ },
+ "if_cond_other": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=IF(B1>0,A2,5)",
+    "A2": "=A1",
+    "B1": 0
+   }
+  }
+ },
+ "if_cond_other2": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=IF(B1>0,A2,5)",
+    "A2": "=A1",
+    "B1": 1
+   }
+  }
+ },
+ "iferror_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=IFERROR(A1,3)",
+    "B1": "=A1"
+   }
+  }
+ },
+ "rows_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=ROWS(A1:A5)",
+    "B1": "=COLUMNS(A1:B1)"
+   }
+  }
+ },
+ "index_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=INDEX(A2:A5,1)",
+    "A2": "=A1+1"
+   }
+  }
+ },
+ "countblank_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=COUNTBLANK(A1:A5)"
+   }
+  }
+ },
+ "count_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=COUNT(A1:A5)",
+    "A2": 1
+   }
+  }
+ },
+ "isblank_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=ISBLANK(A1)"
+   }
+  }
+ },
+ "long_cycle": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=A2",
+    "A2": "=A3",
+    "A3": "=A4",
+    "A4": "=A1",
+    "B1": "=A3*2",
+    "B2": 7,
+    "B3": "=B2+1"
+   }
+  }
+ },
+ "cycle_and_independent": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=B1",
+    "B1": "=A1",
+    "C1": "=D1*2",
+    "D1": 4,
+    "E1": "=SUM(C1:D1)"
+   }
+  }
+ },
+ "cycle_sheets3": {
+  "sheets": {
+   "S1": {
+    "A1": "=S2!A1"
+   },
+   "S2": {
+    "A1": "=S3!A1"
+   },
+   "S3": {
+    "A1": "=S1!A1+1",
+    "B1": "=A1"
+   }
+  }
+ },
+ "sum_including_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": "=SUM(A1:A4)",
+    "A4": 3,
+    "B1": "=A3"
+   }
+  }
+ },
+ "match_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=MATCH(2,A2:A3,0)",
+    "A2": 1,
+    "A3": 2,
+    "B1": "=VLOOKUP(1,A2:B3,1,0)"
+   }
+  }
+ },
+ "vlookup_self_col": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 5,
+    "B1": "=VLOOKUP(5,A1:B1,1,0)"
+   }
+  }
+ },
+ "vlookup_self_ret": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 5,
+    "B1": "=VLOOKUP(5,A1:B1,2,0)"
+   }
+  }
+ },
+ "sumif_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=SUMIF(A2:A5,\">0\")",
+    "A2": 1,
+    "A3": "=A1"
+   }
+  }
+ },
+ "dep_order": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=A3+A2",
+    "A2": "=A3*2",
+    "A3": "=Sheet2!A1",
+    "B1": "=A1&\"\""
+   },
+   "Sheet2": {
+    "A1": "=Sheet1!C1+1"
+   }
+  }
+ },
+ "chain_after_cycle": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=A1",
+    "A2": "=ISERROR(A1)",
+    "A3": "=IFERROR(A1,\"c\")",
+    "A4": "=ISNA(A1)",
+    "A5": "=ISERR(A1)"
+   }
+  }
+ },
+ "cycle_text": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=B1&\"x\"",
+    "B1": "=LEN(A1)"
+   }
+  }
+ },
+ "and_cycle": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=AND(A1:A2)",
+    "A2": true
+   }
+  }
+ },
+ "cycle_choose": {
+  "sheets": {
+   "Sheet1": {
+    "A1": "=CHOOSE(2,A1,7)"
+   }
+  }
+ }
+}

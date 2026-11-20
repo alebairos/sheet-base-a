@@ -1,0 +1,263 @@
+{
+ "if_untaken": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "B1": 2
+   }
+  }
+ },
+ "if_taken": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "if_cond_other": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 5,
+    "A2": 5,
+    "B1": 0
+   }
+  }
+ },
+ "if_cond_other2": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "A2": {
+     "error": "#VALUE!"
+    },
+    "B1": 1
+   }
+  }
+ },
+ "iferror_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 3,
+    "B1": 3
+   }
+  }
+ },
+ "rows_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 5,
+    "B1": 2
+   }
+  }
+ },
+ "index_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "A2": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "countblank_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 4
+   }
+  }
+ },
+ "count_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 1
+   }
+  }
+ },
+ "isblank_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": false
+   }
+  }
+ },
+ "long_cycle": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "A2": {
+     "error": "#VALUE!"
+    },
+    "A3": {
+     "error": "#VALUE!"
+    },
+    "A4": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "B2": 7,
+    "B3": 8
+   }
+  }
+ },
+ "cycle_and_independent": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    },
+    "C1": 8,
+    "D1": 4,
+    "E1": 12
+   }
+  }
+ },
+ "cycle_sheets3": {
+  "sheets": {
+   "S1": {
+    "A1": {
+     "error": "#VALUE!"
+    }
+   },
+   "S2": {
+    "A1": {
+     "error": "#VALUE!"
+    }
+   },
+   "S3": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "sum_including_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 2,
+    "A3": {
+     "error": "#VALUE!"
+    },
+    "A4": 3,
+    "B1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "match_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 2,
+    "A2": 1,
+    "A3": 2,
+    "B1": 1
+   }
+  }
+ },
+ "vlookup_self_col": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 5,
+    "B1": 5
+   }
+  }
+ },
+ "vlookup_self_ret": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 5,
+    "B1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "sumif_self": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 1,
+    "A2": 1,
+    "A3": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "dep_order": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 3,
+    "A2": 2,
+    "A3": 1,
+    "B1": "3"
+   },
+   "Sheet2": {
+    "A1": 1
+   }
+  }
+ },
+ "chain_after_cycle": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "A2": true,
+    "A3": "c",
+    "A4": false,
+    "A5": true
+   }
+  }
+ },
+ "cycle_text": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "B1": {
+     "error": "#VALUE!"
+    }
+   }
+  }
+ },
+ "and_cycle": {
+  "sheets": {
+   "Sheet1": {
+    "A1": {
+     "error": "#VALUE!"
+    },
+    "A2": true
+   }
+  }
+ },
+ "cycle_choose": {
+  "sheets": {
+   "Sheet1": {
+    "A1": 7
+   }
+  }
+ }
+}
