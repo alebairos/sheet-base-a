@@ -7,7 +7,7 @@ done
 if [ -z "$BROWSER" ]; then echo "ui: skipped (no headless Chromium found)"; exit 0; fi
 PROFILE=$(mktemp -d)
 TITLE=$(timeout 90 "$BROWSER" --headless --disable-gpu --no-sandbox --user-data-dir="$PROFILE" \
-  --allow-file-access-from-files --dump-dom "file://$PWD/tests/ui/smoke.html" 2>/dev/null \
+  --allow-file-access-from-files --virtual-time-budget=10000 --dump-dom "file://$PWD/tests/ui/smoke.html" 2>/dev/null \
   | sed -n 's:.*<title>\(.*\)</title>.*:\1:p' | head -n 1)
 rm -rf "$PROFILE"
 case "$TITLE" in

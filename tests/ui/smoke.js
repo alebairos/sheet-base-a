@@ -42,5 +42,40 @@
   } catch (e) {
     fails.push('exception ' + e.message);
   }
-  document.title = fails.length ? 'FAIL ' + fails.join('; ') : 'PASS';
+  const finish = () => { document.title = fails.length ? 'FAIL ' + fails.join('; ') : 'PASS'; };
+  // open and save go through the real file input and download link
+  const until = async (cond) => { for (let i = 0; i < 200 && !cond(); i++) await new Promise((r) => setTimeout(r, 10)); };
+  const open = async (name, text) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([text], name));
+    const fo = $('file-open');
+    fo.files = dt.files;
+    fo.dispatchEvent(new Event('change'));
+    await until(() => $('status').textContent === 'opened ' + name);
+  };
+  let saved = null;
+  URL.createObjectURL = (blob) => { saved = blob; return 'blob:test'; };
+  URL.revokeObjectURL = () => {};
+  HTMLAnchorElement.prototype.click = function () {};
+  const save = async (btn) => { saved = null; $(btn).click(); return saved ? saved.text() : null; };
+  (async () => {
+    try {
+      await open('data.csv', 'name,qty\nx,"2"\ny,=B2*3\n');
+      eq('csv tab', $('sheet-tabs').textContent, 'data');
+      eq('csv text', cell(1, 0).textContent, 'x');
+      eq('csv formula', cell(2, 1).textContent, '6');
+      const csv = await save('btn-save-csv');
+      eq('saved csv', csv && csv.replace(/\r/g, ''), 'name,qty\nx,2\ny,6\n');
+      const json = JSON.parse(await save('btn-save-json'));
+      eq('saved json formula', json.sheets.data.B3, '=B2*3');
+      await open('book.json', JSON.stringify({ sheets: { S1: { A1: 4, A2: '=A1/0' }, S2: { A1: '=S1!A1+1' } } }));
+      eq('json tabs', $('sheet-tabs').textContent, 'S1S2');
+      eq('json error', cell(1, 0).textContent, '#DIV/0!');
+      const json2 = JSON.parse(await save('btn-save-json'));
+      eq('json round trip', JSON.stringify(json2), JSON.stringify({ sheets: { S1: { A1: 4, A2: '=A1/0' }, S2: { A1: '=S1!A1+1' } } }));
+    } catch (e) {
+      fails.push('exception ' + e.message);
+    }
+    finish();
+  })();
 })();
