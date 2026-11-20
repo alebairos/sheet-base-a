@@ -823,6 +823,21 @@
       }
     }
 
+    // number of non-blank cells in a range, without computing formulas
+    countCells(rg) {
+      const sh = rg.sheet;
+      const r2 = Math.min(rg.r2, sh.maxR), c2 = Math.min(rg.c2, sh.maxC);
+      if (r2 < rg.r1 || c2 < rg.c1) return 0;
+      const area = (r2 - rg.r1 + 1) * (c2 - rg.c1 + 1);
+      let n = 0;
+      if (area > sh.cells.size) {
+        for (const cell of sh.cells.values()) if (cell.r >= rg.r1 && cell.r <= r2 && cell.c >= rg.c1 && cell.c <= c2) n++;
+      } else {
+        for (let c = rg.c1; c <= c2; c++) for (let r = rg.r1; r <= r2; r++) if (sh.cells.has(r * MAXCOL + c)) n++;
+      }
+      return n;
+    }
+
     // the first column (or row) of a range as grid() gives it; cached for
     // lookups once every cell in it is final (none is being computed)
     firstLine(v, byRow) {
@@ -1347,7 +1362,13 @@
           // it, and the column's error ends the scan.
           // (cells a block's error skips are not computed: no false cycles)
           let prevR = -2, prevF = false, blockErr = false, pcol = -1, stop = false;
-          const pre = opts.colLastErr ? (r, c) => {
+          // opts.colCont (AVERAGE, PRODUCT): an error ends its column, the
+          // later columns are still computed; the first error is the result
+          let colErr = false, ccol = -1, lastCol = false;
+          const pre = opts.colCont ? (r, c) => {
+            if (c !== ccol) { ccol = c; colErr = false; if (lastCol) stop = true; }
+            return colErr || stop;
+          } : opts.colLastErr ? (r, c) => {
             if (c !== pcol) { pcol = c; prevR = -2; if (err) stop = true; }
             if (stop) return true;
             const cell = v.sheet.cells.get(r * MAXCOL + c);
@@ -1357,9 +1378,14 @@
             return blockErr;
           } : null;
           this.eachCell(v, (x, r, c) => {
-            if (c !== col) { if (err) return false; col = c; cur = []; parts.push(cur); }
+            if (c !== col) { if (err && !opts.colCont) return false; col = c; cur = []; parts.push(cur); }
             if (typeof x === 'number') { nums.push(x); cur.push(x); } else if (typeof x === 'boolean') { nums.push(x ? 1 : 0); cur.push(x ? 1 : 0); }
-            else if (isErr(x) && !opts.skipErrors) { err = x; blockErr = true; return !!opts.colLastErr; }
+            else if (isErr(x) && !opts.skipErrors) {
+              // (a cell being computed, Err:522, does not end its column, but
+              // no later column is computed)
+              if (opts.colCont) { if (!err) err = x; if (x.code !== 'Err:522') colErr = true; else lastCol = true; return true; }
+              err = x; blockErr = true; return !!opts.colLastErr;
+            }
             return true;
           }, false, pre);
           if (err) return { err };
@@ -1735,11 +1761,11 @@
   // reports the last error in that column (Calc's per-column sum)
   aggregate('SUM', (n, b, parts) => finite(sumParts(parts)), { colLastErr: true });
   // AVERAGE adds every value to one Kahan sum (no per-column sums)
-  aggregate('AVERAGE', (n, b, parts) => (n.length ? finite(kahan(popOrder(parts)) / n.length) : E.DIV0));
+  aggregate('AVERAGE', (n, b, parts) => (n.length ? finite(kahan(popOrder(parts)) / n.length) : E.DIV0), { colCont: true });
   const asFmt = (x, b) => (b && (x === 0 || x === 1) ? x === 1 : x);
   aggregate('MIN', (n, b) => (n.length ? asFmt(Math.min(...n), b) : 0), { textParam: true }, 1);
   aggregate('MAX', (n, b) => (n.length ? asFmt(Math.max(...n), b) : 0), { textParam: true }, 1);
-  aggregate('PRODUCT', (n, b, parts) => (n.length ? finite(popOrder(parts).reduce((x, y) => x * y, 1)) : 0));
+  aggregate('PRODUCT', (n, b, parts) => (n.length ? finite(popOrder(parts).reduce((x, y) => x * y, 1)) : 0), { colCont: true });
   aggregate('COUNT', (n) => n.length, { skipErrors: true, countText: true });
   aggregate('MEDIAN', (n) => {
     if (!n.length) return E.VALUE;
@@ -1778,8 +1804,10 @@
     for (const node of nodes) {
       if (node.t === 'missing') { n++; continue; } // an empty argument is 0
       const v = this.ev(node, ctx);
-      if (v instanceof RefList) v.ranges.forEach((rg) => this.eachCell(rg, () => { n++; }));
-      else if (v instanceof Range) this.eachCell(v, () => { n++; });
+      // cells of a reference are counted without computing them (Calc's
+      // COUNTA never reads a formula cell's value: no circular reference)
+      if (v instanceof RefList) v.ranges.forEach((rg) => { n += this.countCells(rg); });
+      else if (v instanceof Range) n += this.countCells(v);
       else if (v instanceof Matrix) { for (const row of v.data) for (const x of row) if (x !== null) n++; }
       else if (v !== null) n++;
     }
