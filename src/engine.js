@@ -35,7 +35,10 @@
     if (a === b) return true;
     if (a === 0 || b === 0) return false;
     const d = Math.abs(a - b);
-    return d < Math.abs(a) * E48 && d < Math.abs(b) * E48;
+    if (!isFinite(d) || d > Math.abs(a) * E48 || d > Math.abs(b) * E48) return false;
+    // representable integers are never "approximately" equal (rtl::math::approxEqual)
+    const repInt = (x) => Number.isInteger(x) && Math.abs(x) < 9007199254740992;
+    return !(repInt(d) && repInt(a) && repInt(b));
   }
   function approxAdd(a, b) {
     if (((a < 0 && b > 0) || (b < 0 && a > 0)) && approxEqual(a, -b)) return 0;
@@ -940,16 +943,19 @@
       }
       // Calc pops parameters from the stack: the last one is examined first
       // (MEDIAN gathers its parameters into an array first: first one first)
-      const parts = []; // Calc's pop order: a number, or a range's numbers
+      // for SUM's rounding: Calc's pop order, each item a number or the
+      // numbers of one column of a range
+      const parts = [];
       for (let j = 0; j < vals.length; j++) {
         const k = opts.forward ? j : vals.length - 1 - j;
         const v = vals[k];
         const n0 = nums.length;
-        if (v instanceof Range || v instanceof Matrix) parts.push(nums); // placeholder, fixed below
+        if (v instanceof Matrix) parts.push(nums); // placeholder, fixed below
         if (v instanceof Range) {
-          let err = null;
-          this.eachCell(v, (x) => {
-            if (typeof x === 'number') { nums.push(x); } else if (typeof x === 'boolean') nums.push(x ? 1 : 0);
+          let err = null, col = -1, cur = null;
+          this.eachCell(v, (x, r, c) => {
+            if (c !== col) { col = c; cur = []; parts.push(cur); }
+            if (typeof x === 'number') { nums.push(x); cur.push(x); } else if (typeof x === 'boolean') { nums.push(x ? 1 : 0); cur.push(x ? 1 : 0); }
             else if (isErr(x) && !opts.skipErrors) { err = x; return false; }
             return true;
           });
@@ -964,7 +970,7 @@
           if (opts.countText) { if (n !== null) { nums.push(n); } } else return { err: E.VALUE };
         }
         if (parts[parts.length - 1] === nums) parts[parts.length - 1] = nums.slice(n0);
-        else if (nums.length > n0) parts.push(nums[n0]);
+        else if (nums.length > n0 && !(v instanceof Range)) parts.push(nums[n0]);
       }
       if (!opts.forward) nums.reverse();
       // MIN/MAX take the number format of the first value of the first
@@ -1252,26 +1258,51 @@
     if (Math.abs(st.sum) >= Math.abs(v)) st.err += (st.sum - t) + v; else st.err += (v - t) + st.sum;
     st.sum = t;
   };
-  const kahan = (nums) => {
-    const st = { sum: 0, err: 0 };
-    let mem = 0;
-    for (const x of nums) {
-      if (x === 0) continue;
-      if (mem === 0) { mem = x; continue; }
-      neumaier(st, mem);
-      mem = x;
-    }
+  const kahanAdd = (st, x) => {
+    if (x === 0) return;
+    if (st.mem === 0) { st.mem = x; return; }
+    neumaier(st, st.mem);
+    st.mem = x;
+  };
+  const kahanGet = (st) => {
     const total = st.sum + st.err;
-    if (mem === 0) return total;
-    if (((mem < 0 && total > 0) || (total < 0 && mem > 0)) && approxEqual(mem, -total)) return 0;
-    neumaier(st, mem);
-    return st.sum + st.err;
+    if (st.mem === 0) return total;
+    if (((st.mem < 0 && total > 0) || (total < 0 && st.mem > 0)) && approxEqual(st.mem, -total)) return 0;
+    const t = { sum: st.sum, err: st.err };
+    neumaier(t, st.mem);
+    return t.sum + t.err;
+  };
+  const kahan = (nums) => {
+    const st = { sum: 0, err: 0, mem: 0 };
+    for (const x of nums) kahanAdd(st, x);
+    return kahanGet(st);
+  };
+  // A range's numbers are summed like Calc's sc::op::sumArray (SSE2): blocks of
+  // 8 go to 4 accumulators of 2 lanes with Neumaier compensation, combined
+  // pairwise; the remaining values are added one by one.
+  const sumArray = (xs) => {
+    const n = xs.length;
+    let i = 0;
+    const st = { sum: 0, err: 0, mem: 0 };
+    if (n > 7) {
+      const S = [];
+      for (let j = 0; j < 8; j++) S.push({ sum: 0, err: 0 });
+      for (; i + 7 < n; i += 8) for (let j = 0; j < 8; j++) neumaier(S[j], xs[i + j]);
+      const comb = (a, b) => {
+        for (let l = 0; l < 2; l++) { neumaier(S[a + l], S[b + l].sum); neumaier(S[a + l], S[b + l].err); }
+      };
+      comb(0, 2); comb(4, 6); comb(0, 4);
+      st.sum = S[0].sum; st.err = S[0].err;
+      neumaier(st, S[1].sum); neumaier(st, S[1].err);
+    }
+    for (; i < n; i++) kahanAdd(st, xs[i]);
+    return kahanGet(st);
   };
   const finite = (x) => (isFinite(x) ? x : E.NUM);
 
   // SUM/AVERAGE: parameters are popped last to first; a range is summed on
   // its own (first cell first) and its total added as one term
-  const sumParts = (parts) => kahan(parts.map((p) => (Array.isArray(p) ? kahan(p) : p)));
+  const sumParts = (parts) => kahan(parts.map((p) => (Array.isArray(p) ? sumArray(p) : p)));
   aggregate('SUM', (n, b, parts) => finite(sumParts(parts)));
   aggregate('AVERAGE', (n, b, parts) => (n.length ? finite(sumParts(parts) / n.length) : E.DIV0));
   const asFmt = (x, b) => (b && (x === 0 || x === 1) ? x === 1 : x);
